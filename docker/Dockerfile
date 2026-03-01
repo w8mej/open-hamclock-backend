@@ -88,6 +88,7 @@ RUN cd /opt/hamclock-backend && \
     # \
     # set up logrotate \
     mv ohb.logrotate /etc/logrotate.d/ohb && \
+    chown root:root /etc/logrotate.d/ohb && \
     # \
     # set up lighttpd \
     cp lighttpd-conf/*.conf /etc/lighttpd/conf-available/ && \
