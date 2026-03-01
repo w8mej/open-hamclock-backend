@@ -40,7 +40,10 @@ mv "$TMPFILE" "$TLEFILE"
 echo "TLEs installed ($STAMP)"
 
 # Keep last 60 snapshots
-ls -1t "$ARCHIVE"/tles-* 2>/dev/null | tail -n +61 | xargs -r rm --
+#ls -1t "$ARCHIVE"/tles-* 2>/dev/null | tail -n +61 | xargs -r rm --
+
+mapfile -t old_archives < <(ls -1t "$ARCHIVE"/tles-* 2>/dev/null | tail -n +61)
+[[ ${#old_archives[@]} -gt 0 ]] && rm -- "${old_archives[@]}"
 
 # Always run AMSAT filter
 echo "[$(ts)] Running AMSAT status filter..."
