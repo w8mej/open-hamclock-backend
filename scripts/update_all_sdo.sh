@@ -35,11 +35,11 @@ extract_frame_png() {
   local mp4="$1"
   local png="$2"
 
-  # Ensure target directory exists
   mkdir -p "$(dirname "$png")"
 
-  # Extract the first decoded frame as PNG, forcing RGB24 (no alpha/palette surprises)
+  # Extract the last frame (most recent) instead of the first
   ffmpeg -hide_banner -loglevel error -y \
+    -sseof -3 \
     -i "$mp4" \
     -vf "select=eq(n\,0)" -vframes 1 \
     -pix_fmt rgb24 \
