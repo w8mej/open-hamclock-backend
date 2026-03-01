@@ -7,6 +7,8 @@ When the original backend went dark, the clocks didn’t have to.
 
 🧱 Open-source, self-hostable backend replacement for HamClock — restoring live propagation data, maps, and feeds.
 
+The software is free to use and download. We do not take donations at this time.
+
 OHB currently proxies VOACAP and PSKReporter. All other feeds and maps are generated locally. Backend selection remains user-controlled.
 
 What's a backend? It is how HamClock got all of its data. Without a separate backend, all HamClock's will cease to function by June 2026.
