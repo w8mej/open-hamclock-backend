@@ -692,7 +692,7 @@ determine_http_log() {
 
     if [ "$ENABLE_EXTERNAL_HTTP_LOG" == true ]; then
         EXTERNAL_HTTP_LOG_MAPPING="- $HERE/logs/lighttpd:/var/log/lighttpd:rw"
-        if [ $(stat -c '%u' "$HERE/logs/lighttpd") -ne 33 ]; then
+        if [ $(stat -c '%u' "$HERE/logs/lighttpd" 2>/dev/null) -ne 33 ]; then
             mkdir -p "$HERE/logs/lighttpd"
             # perms need to be set for logrotate to work
             echo "WARNING: folder '$HERE/logs/lighttpd' needs the following permission:"
