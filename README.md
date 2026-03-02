@@ -48,6 +48,14 @@ Important: Editing your hosts file overrides normal DNS for the specified hostna
 ### /etc/hosts file modification
 These steps will tell your system to not use clearskyinstitute.com if you do not use the -b option for local install. For now, **do not** use this option if you are self-hosting. This is a semi-permanent change.
 
+/etc/hosts doesn't persist after a reboot on Trixie.
+
+It's controlled by this line in /boot/firmware/user_data
+
+manage_etc_hosts: true
+
+It must be set to false, and then the Pi rebooted to take into effect so that /etc/hosts will persist. Set manage_etc_hosts to true and reboot before modifying your /etc/hosts file.
+
 ```sudo nano /etc/hosts```
 
 Add this line:
