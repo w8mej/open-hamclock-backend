@@ -54,7 +54,7 @@ It's controlled by this line in /boot/firmware/user_data
 
 manage_etc_hosts: true
 
-It must be set to false, and then the Pi rebooted to take into effect so that /etc/hosts will persist. Set manage_etc_hosts to true and reboot before modifying your /etc/hosts file.
+It must be set to false, and then the Pi rebooted to take into effect so that /etc/hosts will persist. Set manage_etc_hosts to false and reboot before modifying your /etc/hosts file.
 
 ```sudo nano /etc/hosts```
 
