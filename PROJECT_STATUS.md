@@ -54,7 +54,7 @@ These are endpoints that dynamically return data based on query parameters to th
 - [ ] ham/HamClock/fetchVOACAPArea.pl - proxied by CSI until we can work out complex task
 - [ ] ham/HamClock/fetchVOACAP-MUF.pl - proxied by CSI until we can work out complex task
 - [ ] ham/HamClock/fetchVOACAP-TOA.pl - proxied by CSI until we can work out complex task
-- [ ] [ham/HamClock/fetchPSKReporter.pl](https://github.com/BrianWilkinsFL/open-hamclock-backend/blob/main/ham/HamClock/fetchPSKReporter.pl) - currently proxied, it is implemented however it will be subject to rate limiting if deployed centrally. I have created a PSK Reporter proxy as of last week (https://github.com/BrianWilkinsFL/ohb-pskreporter-proxy) and this requires careful integration testing to ensure it works before I am willing to release it into production
+- [x] [ham/HamClock/fetchPSKReporter.pl](https://github.com/BrianWilkinsFL/open-hamclock-backend/blob/main/ham/HamClock/fetchPSKReporter.pl) 
 - [x] [ham/HamClock/fetchWSPR.pl](https://github.com/BrianWilkinsFL/open-hamclock-backend/blob/main/ham/HamClock/fetchWSPR.pl)
 - [x] [ham/HamClock/fetchRBN.pl](https://github.com/BrianWilkinsFL/open-hamclock-backend/blob/main/ham/HamClock/fetchRBN.pl)
 
@@ -82,8 +82,7 @@ These files never change or are unlikely to need change any time soon.
 - [x] Solar flux + history data generation, pull and display
 - [x] Amateur Satellites data generation, pull and display + [active AMSAT status satellite filter](https://github.com/BrianWilkinsFL/open-hamclock-backend/blob/main/scripts/filter_amsat_active.pl)
 - [x] PSK Reporter WSPR request and display
-- [x] PSK Reporter Spots request and display - proxied
-- [ ] PSK Reporter Spots - non proxied
+- [x] PSK Reporter Spots request and display
 - [X] VOACAP DE DX - proxied
 - [ ] VOACAP DE DX - non proxied
 - [x] VOACAP MUF MAP (REL/TOA) - proxied
