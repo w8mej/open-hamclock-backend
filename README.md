@@ -10,7 +10,7 @@ Mitigates centralized backend risk by enabling deployment across multiple indepe
 
 All maps + data feeds are generated on your own compute. 
 
-Note: VOACAP DE-DX, VOACAP REL/TOA, and PSK Reporter are in work.
+Note: VOACAP DE-DX, VOACAP REL/TOA are in work.
 
 ## Cost
 The software is free to use and download. We do not take donations.
