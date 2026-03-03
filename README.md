@@ -34,6 +34,7 @@ It is how HamClock got all of its data. Without a separate backend, all HamClock
 - Produces zlib-compressed BMP assets in multiple resolutions using the same specialized, RGB top down approach that is required by HamClock
 - Designed for Raspberry Pi, cloud, or on-prem deployment
 - Fully open source and community maintained
+- Requires new, scalable PSK Reporter Fast Cache Service
 - Auto log rotation
 - Command and Control Dashboard (future)
 - Runs in Raspberry Pi 4, 5, PC, Virtual Machine, Bare Metal or Cloud
