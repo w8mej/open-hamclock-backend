@@ -1,27 +1,25 @@
 #!/bin/bash
+set -e
+
 
 # at release time, this value is set to the tagged release
 OHB_MANAGER_VERSION=latest
-GITHUB_LATEST_RELEASE_URL="https://api.github.com/repos/BrianWilkinsFL/open-hamclock-backend/releases/latest"
 
 OHB_HTDOCS_DVC=ohb-htdocs
 IMAGE_BASE=komacke/open-hamclock-backend
 
 # Get our directory locations in order
-HERE="$(realpath -s "$(dirname "$0")" 2>/dev/null)"
-[ -z "$HERE" ] && HERE="$(realpath "$(dirname "$0")")"
+HERE=$(cd "$(dirname "$0")" && pwd)
+cd "$HERE" || exit
 THIS="$(basename "$0")"
 STARTED_FROM="$PWD"
-cd $HERE
 
 DOCKER_PROJECT=${THIS%.*}
 DEFAULT_TAG=$OHB_MANAGER_VERSION
-GIT_TAG=$(git describe --exact-match --tags 2>/dev/null)
+GIT_TAG=$(git describe --exact-match --tags 2>/dev/null || true)
 GIT_VERSION=$(git rev-parse --short HEAD 2>/dev/null)
 CONTAINER=${IMAGE_BASE##*/}
 DEFAULT_HTTP_PORT=:80
-DEFAULT_HTTPS_PORT=-
-DEFAULT_CERT_PATH=-
 DEFAULT_DASHBOARD_INSTALL=true
 DEFAULT_EXTERNAL_HTTP_LOG=false
 # the following env is the lighttpd env file
@@ -86,29 +84,23 @@ main() {
             shift && get_compose_opts "$@"
             copy_env_to_container
             ;;
-        upgrade-me)
-            upgrade_this_script
-            ;;
         *)
             echo "Invalid or missing option. Try using '$THIS help'."
             exit 1
             ;;
     esac
 
-    if [ "$SAVE_STICKY_VARS" == true -a $RETVAL -eq 0 ]; then
+    if [ "$SAVE_STICKY_VARS" == true ] && [ $RETVAL -eq 0 ]; then
         save_sticky_vars
     fi
 }
 
 get_compose_opts() {
-    while getopts ":p:s:c:t:e:d:l:" opt; do
+    while getopts ":p:t:e:d:l:m" opt; do
         case $opt in
-            c)
-                REQUESTED_CERT_PATH="$OPTARG"
-                ;;
             d)
                 REQUESTED_DASHBOARD_INSTALL="$OPTARG"
-                if [ "$REQUESTED_DASHBOARD_INSTALL" != true -a "$REQUESTED_DASHBOARD_INSTALL" != false ]; then
+                if [ "$REQUESTED_DASHBOARD_INSTALL" != true ] && [ "$REQUESTED_DASHBOARD_INSTALL" != false ]; then
                     echo "ERROR: -$opt option must be <true|false>"
                     exit 1
                 fi
@@ -118,16 +110,16 @@ get_compose_opts() {
                 ;;
             l)
                 REQUESTED_EXTERNAL_HTTP_LOG="$OPTARG"
-                if [ "$REQUESTED_EXTERNAL_HTTP_LOG" != true -a "$REQUESTED_EXTERNAL_HTTP_LOG" != false ]; then
+                if [ "$REQUESTED_EXTERNAL_HTTP_LOG" != true ] && [ "$REQUESTED_EXTERNAL_HTTP_LOG" != false ]; then
                     echo "ERROR: -$opt option must be <true|false>"
                     exit 1
                 fi
                 ;;
+            m)
+                REQUESTED_MOCK_HOSTS=true
+                ;;
             p)
                 REQUESTED_HTTP_PORT="$OPTARG"
-                ;;
-            s)
-                REQUESTED_HTTPS_PORT="$OPTARG"
                 ;;
             t)
                 REQUESTED_TAG="$OPTARG"
@@ -199,13 +191,9 @@ $THIS <COMMAND> [options]:
 
     generate-docker-compose [-p <port>] [-t <tag>]: 
             writes the docker compose file to STDOUT
+            -m: mock external clearskyinstitute hosts for isolated testing
             -p: set the HTTP port (defaults to current setting)
             -t: set image tag
-
-    upgrade-me:
-            downloads the latest tagged version of itself and overwrites itself. Runs
-            the new version to confirm it worked. Does an sha256 validation before
-            overwriting itself.
 EOF
 }
 
@@ -215,6 +203,7 @@ ohb_manager_version() {
 
 get_sticky_vars() {
     if [ -r $STICKY_ENV_FILE ]; then
+        # shellcheck disable=SC1090
         source $STICKY_ENV_FILE
     fi
 }
@@ -222,65 +211,10 @@ get_sticky_vars() {
 save_sticky_vars() {
     cat<<EOF > $STICKY_ENV_FILE
 STICKY_HTTP_PORT="$HTTP_PORT"
-STICKY_HTTPS_PORT="$HTTPS_PORT"
 STICKY_DASHBOARD_INSTALL="$ENABLE_DASHBOARD"
 STICKY_LIGHTTPD_ENV_FILE="$ENV_FILE"
 STICKY_EXTERNAL_HTTP_LOG="$ENABLE_EXTERNAL_HTTP_LOG"
-STICKY_CERT_PATH="$CERT_PATH"
 EOF
-}
-
-upgrade_this_script() {
-    CHECK_LATEST_JSON=$(curl -s "$GITHUB_LATEST_RELEASE_URL")
-
-    URL_LATEST_THIS=$(echo "$CHECK_LATEST_JSON" | jq -r ".assets[] | select(.browser_download_url | contains(\"$DOCKER_PROJECT\")) | .browser_download_url")
-    DIGEST_LATEST_THIS=$(echo "$CHECK_LATEST_JSON" | jq -r ".assets[] | select(.browser_download_url | contains(\"$DOCKER_PROJECT\")) | .digest")
-
-    URL_LATEST_RELEASE=$(echo "$CHECK_LATEST_JSON" | jq -r '.html_url')
-    AVAILABLE_VERSION=$(basename "$URL_LATEST_RELEASE")
-
-    if [ "$AVAILABLE_VERSION" == "$OHB_MANAGER_VERSION" ]; then
-        echo "$THIS is currently the latest version: '$OHB_MANAGER_VERSION'"
-        return $RETVAL
-    fi
-    cat <<EOF
-There is a new version: '$AVAILABLE_VERSION'. The version you have is '$OHB_MANAGER_VERSION'.
-
-Source and release notes can be found at this URL:
-
-  $URL_LATEST_RELEASE
-
-Would you like to download the latest version of $THIS and overwrite your current copy?
-EOF
-
-    DEFAULT_DOIT=y
-    read -p "Overwrite? [Y/n]: " DOIT
-    DOIT=${DOIT:-$DEFAULT_DOIT}
-
-    echo
-    if [ "${DOIT,,}" == y ]; then
-        echo "Getting new version ..."
-        TMP_MGR_FILE=$(mktemp -p ./)
-        curl -sLo $TMP_MGR_FILE $URL_LATEST_THIS
-        chmod --reference=$THIS $TMP_MGR_FILE
-
-        DIGEST_FILE=sha256:$(sha256sum $TMP_MGR_FILE | cut -d ' ' -f1)
-        if [ "$DIGEST_FILE" == "$DIGEST_LATEST_THIS" ]; then
-            echo "Successfully downloaded new version. Let's run it and check its version:"
-            echo
-            echo "$ ./$THIS"
-            mv $TMP_MGR_FILE $THIS
-            exec "./$THIS" version
-        else
-            echo
-            echo "ERROR: downloaded file '$TMP_MGR_FILE' seems to be corrupted. Not using it."
-            echo "  Expected: '$DIGEST_LATEST_THIS'"
-            echo "  Got:      '$DIGEST_FILE'"
-            RETVAL=1
-        fi
-    else
-        echo "Because you answered '$DOIT', we won't upgrade and overwrite. 'Y' or 'y' will do the upgrade."
-    fi
 }
 
 install_ohb() {
@@ -321,7 +255,7 @@ is_ohb_installed() {
     else
         echo "  git checkout not found."
     fi
-    TAG_FROM_GIT=$(curl -s --connect-timeout 2 "https://api.github.com/repos/BrianWilkinsFL/open-hamclock-backend/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    TAG_FROM_GIT=$(curl -sf --connect-timeout 2 "https://api.github.com/repos/BrianWilkinsFL/open-hamclock-backend/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     echo "  Latest release available from GitHub: '$TAG_FROM_GIT'"
 
     echo
@@ -349,16 +283,9 @@ is_ohb_installed() {
         return $RETVAL
     else
         get_current_http_port
-        get_current_https_port
         echo "  OHB version:       '$CURRENT_TAG'"
         echo "  Docker image:      '$CURRENT_IMAGE_BASE:$CURRENT_TAG'"
         echo "  HTTP PORT in use:  '$CURRENT_HTTP_PORT'"
-        if [ -n "$CURRENT_HTTPS_PORT" ]; then
-            echo "  HTTPS PORT in use: '$CURRENT_HTTPS_PORT'"
-        fi
-        if [ "$STICKY_CERT_PATH" != "-" ]; then
-            echo "  HTTPS cert path:   '$STICKY_CERT_PATH'"
-        fi
         echo -n "  Dashboard enabled: "
         if [ -n "$STICKY_DASHBOARD_INSTALL" ]; then
             echo "'$STICKY_DASHBOARD_INSTALL'"
@@ -377,7 +304,6 @@ upgrade_ohb() {
     is_docker_installed >/dev/null || return $?
 
     get_current_http_port
-    get_current_https_port
     get_current_image_tag
 
     echo "Upgrading OHB ..."
@@ -394,25 +320,25 @@ upgrade_ohb() {
 }
 
 is_docker_installed() {
-    DOCKERD_VERSION=$(dockerd -v 2>/dev/null)
-    DOCKERD_RETVAL=$?
+    DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null)
+    DOCKER_RETVAL=$?
     DOCKER_COMPOSE_VERSION=$(docker compose version 2>/dev/null)
     DOCKER_COMPOSE_RETVAL=$?
     JQ_VERSION=$(jq --version 2>/dev/null)
     JQ_RETVAL=$?
 
-    if [ $DOCKERD_RETVAL -ne 0 ]; then
-        echo "ERROR: docker is not installed. Could not find dockerd." >&2
-        RETVAL=$DOCKERD_RETVAL
+    if [ $DOCKER_RETVAL -ne 0 ]; then
+        echo "ERROR: docker engine/daemon is not running or installed. Could not connect to docker." >&2
+        RETVAL=$DOCKER_RETVAL
     elif [ $DOCKER_COMPOSE_RETVAL -ne 0 ]; then
         echo "ERROR: docker compose is not installed but we found docker. Try installing docker compose." >&2
-        echo "  docker version found: '$DOCKERD_VERSION'" >&2
+        echo "  docker version found: '$DOCKER_VERSION'" >&2
         RETVAL=$DOCKER_COMPOSE_RETVAL
     elif [ $JQ_RETVAL -ne 0 ]; then
         echo "ERROR: jq is not installed. Could not find jq." >&2
         RETVAL=$JQ_RETVAL
     else
-        echo "$DOCKERD_VERSION"
+        echo "Docker Engine v$DOCKER_VERSION"
         echo "$DOCKER_COMPOSE_VERSION"
         echo "$JQ_VERSION"
     fi
@@ -439,13 +365,11 @@ docker_compose_up() {
         echo "OHB is already running."
         RETVAL=1
     else
-        docker_compose_yml && docker compose -f <(echo "$DOCKER_COMPOSE_YML") create
-        RETVAL=$?
-        [ $RETVAL -ne 0 ] && return $RETVAL
-        if [ -n "$REQUESTED_ENV_FILE" -o -n "$STICKY_LIGHTTPD_ENV_FILE" -o -r "$DEFAULT_ENV_FILE" ]; then
+        docker_compose_yml && docker compose -f <(echo "$DOCKER_COMPOSE_YML") create 
+        if [ -n "$REQUESTED_ENV_FILE" ] || [ -n "$STICKY_LIGHTTPD_ENV_FILE" ] || [ -r "$DEFAULT_ENV_FILE" ]; then
             copy_env_to_container >/dev/null
         fi
-        docker compose -f <(echo "$DOCKER_COMPOSE_YML") up -d
+        docker_compose_yml && docker compose -f <(echo "$DOCKER_COMPOSE_YML") up -d
         RETVAL=$?
     fi
 
@@ -474,7 +398,6 @@ docker_compose_down() {
 
 docker_compose_reset() {
     get_current_http_port
-    get_current_https_port
     get_current_image_tag
     docker_compose_down || return $RETVAL
     docker_compose_up
@@ -507,7 +430,6 @@ remove_ohb() {
 
 recreate_ohb() {
     get_current_http_port
-    get_current_https_port
     get_current_image_tag
 
     remove_ohb || return $RETVAL
@@ -582,18 +504,6 @@ get_current_http_port() {
     fi
 }
 
-get_current_https_port() {
-    DOCKER_HTTPS_PORT=$(docker inspect $CONTAINER 2>/dev/null | jq -r '.[0].HostConfig.PortBindings."443/tcp"[0].HostPort')
-    DOCKER_HTTPS_IP=$(docker inspect $CONTAINER 2>/dev/null | jq -r '.[0].HostConfig.PortBindings."443/tcp"[0].HostIp')
-    if [ "$DOCKER_HTTPS_PORT" != 'null' ]; then
-        if [ "$DOCKER_HTTPS_IP" != 'null' ]; then
-            CURRENT_HTTPS_PORT=$DOCKER_HTTPS_IP:$DOCKER_HTTPS_PORT
-        else
-            CURRENT_HTTPS_PORT=:$DOCKER_HTTPS_PORT
-        fi
-    fi
-}
-
 get_current_image_tag() {
     CURRENT_DOCKER_IMAGE=$(docker inspect open-hamclock-backend 2>/dev/null | jq -r '.[0].Config.Image')
     if [ "$CURRENT_DOCKER_IMAGE" != 'null' ]; then
@@ -602,7 +512,7 @@ get_current_image_tag() {
     fi
 }
 
-determine_http_port() {
+determine_port() {
     get_current_http_port
 
     # first precedence
@@ -610,7 +520,7 @@ determine_http_port() {
         HTTP_PORT=$REQUESTED_HTTP_PORT
 
     # second precedence
-    elif [ -n "$CURRENT_HTTP_PORT" -a "$CURRENT_HTTP_PORT" != ':' ]; then
+    elif [ -n "$CURRENT_HTTP_PORT" ] && [ "$CURRENT_HTTP_PORT" != ':' ]; then
         HTTP_PORT=$CURRENT_HTTP_PORT
 
     # third precedence
@@ -625,36 +535,6 @@ determine_http_port() {
 
     # if there was a :, it was probably IP:PORT; otherwise make sure there's a colon for port only
     [[ $HTTP_PORT =~ : ]] || HTTP_PORT=":$HTTP_PORT"
-}
-
-determine_https_port() {
-    get_current_https_port
-
-    # first precedence
-    if [ -n "$REQUESTED_HTTPS_PORT" ]; then
-        HTTPS_PORT=$REQUESTED_HTTPS_PORT
-
-    # second precedence
-    elif [ -n "$CURRENT_HTTPS_PORT" -a "$CURRENT_HTTPS_PORT" != ':' ]; then
-        HTTPS_PORT=$CURRENT_HTTPS_PORT
-
-    # third precedence
-    elif [ -n "$STICKY_HTTPS_PORT" ]; then
-        HTTPS_PORT=$STICKY_HTTPS_PORT
-
-    # fourth precedence
-    else
-        HTTPS_PORT=$DEFAULT_HTTPS_PORT
-
-    fi
-
-    if [ "$HTTPS_PORT" == "-" ]; then
-        HTTPS_PORT_MAPPING=""
-    else
-        # if there was a :, it was probably IP:PORT; otherwise make sure there's a colon for port only
-        [[ $HTTPS_PORT =~ : ]] || HTTPS_PORT=":$HTTPS_PORT"
-        HTTPS_PORT_MAPPING="- $HTTPS_PORT:443"
-    fi
 }
 
 determine_dashboard() {
@@ -689,46 +569,6 @@ determine_http_log() {
         ENABLE_EXTERNAL_HTTP_LOG=$DEFAULT_EXTERNAL_HTTP_LOG
 
     fi
-
-    if [ "$ENABLE_EXTERNAL_HTTP_LOG" == true ]; then
-        EXTERNAL_HTTP_LOG_MAPPING="- $HERE/logs/lighttpd:/var/log/lighttpd:rw"
-        if [ "${FUNCNAME[2]}" == "docker_compose_up" ]; then
-            if [ ! -e "$HERE/logs/lighttpd" ]; then
-                mkdir -p "$HERE/logs/lighttpd"
-            fi
-            if [ "$(stat -c '%u' "$HERE/logs/lighttpd" 2>/dev/null)" != "33" ]; then
-                # perms need to be set for logrotate to work
-                echo
-                echo "WARNING: folder '$HERE/logs/lighttpd' needs the following permission:"
-                echo "   sudo chown 33 $HERE/logs/lighttpd"
-                echo
-            fi
-        fi
-    fi
-}
-
-determine_https_cert() {
-
-    # first precedence
-    if [ -n "$REQUESTED_CERT_PATH" ]; then
-        CERT_PATH=$REQUESTED_CERT_PATH
-
-    # second precedence
-    elif [ -n "$STICKY_CERT_PATH" ]; then
-        CERT_PATH=$STICKY_CERT_PATH
-
-    # third precedence
-    else
-        CERT_PATH=$DEFAULT_CERT_PATH
-
-    fi
-
-    if [ "$CERT_PATH" == "-" ]; then
-        HTTPS_CERT_MAPPING=""
-    else
-        # if there was a :, it was probably IP:PORT; otherwise make sure there's a colon for port only
-        HTTPS_CERT_MAPPING="- $CERT_PATH:/etc/lighttpd/server.pem"
-    fi
 }
 
 determine_tag() {
@@ -745,21 +585,11 @@ determine_tag() {
 
     # second precedence
     # FUNCNAME is a stack of nested function calls
-    if [ -n "$CURRENT_TAG" -a ${FUNCNAME[3]} != upgrade_ohb ]; then
+    if [ -n "$CURRENT_TAG" ] && [ "${FUNCNAME[3]:-}" != upgrade_ohb ]; then
         TAG=$CURRENT_TAG
 
     # third precedence
     elif [ -n "$GIT_TAG" ]; then 
-        if [ ${FUNCNAME[3]} == upgrade_ohb -a "$GIT_TAG" != "$OHB_MANAGER_VERSION" ]; then
-            echo
-            echo "WARNING:"
-            echo "         You are in a git repository on tag: '$GIT_TAG'"
-            echo "         Your version of '$THIS' is: '$OHB_MANAGER_VERSION'"
-            echo
-            echo "Please run upgrade again setting the version with the -t option."
-            echo
-            return 1
-        fi
         TAG=$GIT_TAG
 
     # forth precedence
@@ -770,18 +600,24 @@ determine_tag() {
 }
 
 docker_compose_yml() {
-    determine_http_port
-    determine_https_port
-    determine_https_cert
-    determine_dashboard
-    determine_http_log
+    determine_port
 
-    determine_tag || return $?
+    determine_tag
     IMAGE=$IMAGE_BASE:$TAG
 
-    if [ "$TAG" == "$CURRENT_TAG"  -a "$REQUEST_DOCKER_PULL" == true ]; then
+    determine_dashboard
+
+    determine_http_log
+
+    if [ "$TAG" == "$CURRENT_TAG" ] && [ "$REQUEST_DOCKER_PULL" == true ]; then
         echo "Doing a docker pull of the image before docker compose."
-        docker pull $IMAGE
+        docker pull $IMAGE | sed 's/^/  /'
+    fi
+
+    if [ "$REQUESTED_MOCK_HOSTS" == "true" ]; then
+        EXTRA_ENV_CONFIG="      DISABLE_VOACAP_PROXY: \"true\""
+    else
+        EXTRA_ENV_CONFIG=""
     fi
 
     # compose file in $DOCKER_COMPOSE_YML
@@ -791,10 +627,10 @@ docker_compose_yml() {
             sed "s|__IMAGE__|$IMAGE|" |
             sed "s/__CONTAINER__/$CONTAINER/" |
             sed "s/__HTTP_PORT__/$HTTP_PORT/" |
-            sed "s/__HTTPS_PORT_MAPPING__/$HTTPS_PORT_MAPPING/" |
             sed "s/__ENABLE_DASHBOARD__/$ENABLE_DASHBOARD/" |
-            sed "s|__EXTERNAL_HTTP_LOG_MAPPING__|$EXTERNAL_HTTP_LOG_MAPPING|" |
-            sed "s|__HTTPS_CERT_MAPPING__|$HTTPS_CERT_MAPPING|"
+            sed "s|__ENABLE_EXTERNAL_HTTP_LOG__|- $HERE/logs/lighttpd:/var/log/lighttpd:rw|" |
+            sed "s|__EXTRA_ENV_CONFIG__|$EXTRA_ENV_CONFIG|" |
+            tr '^' '\n'
     )
 }
 
@@ -808,44 +644,23 @@ services:
     restart: unless-stopped
     environment:
       ENABLE_DASHBOARD: __ENABLE_DASHBOARD__
-      PSKR_UID: 1001
+__EXTRA_ENV_CONFIG__
     networks:
       - ohb
     ports:
       - __HTTP_PORT__:80
-      __HTTPS_PORT_MAPPING__
     volumes:
       - ohb-htdocs:/opt/hamclock-backend/htdocs
-      __EXTERNAL_HTTP_LOG_MAPPING__
-      __HTTPS_CERT_MAPPING__
+      __ENABLE_EXTERNAL_HTTP_LOG__
     healthcheck:
       test: ["CMD", "curl", "-f", "-A", "healthcheck/1.0", "http://localhost:80/ham/HamClock/version.pl"]
+      interval: "10s"
       timeout: "5s"
-      start_period: "20s"
+      start_period: "120s"
     logging:
       options:
         max-size: "10m"
         max-file: "2"
-
-  pskr:
-    container_name: pskr-mqtt-cache
-    image: komacke/pskr-mqtt-cache:1.0
-    restart: unless-stopped
-    networks:
-      - ohb
-    volumes:
-      - type: volume
-        source: ohb-htdocs
-        target: /data
-        volume:
-          subpath: pskr
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "2"
-    depends_on:
-      web:
-        condition: service_healthy
 
 networks:
   ohb:

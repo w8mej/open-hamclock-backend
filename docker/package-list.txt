@@ -5,7 +5,6 @@ less
 vim
 
 # packages required by hamclock-backend
-anonip
 bc
 cron
 curl
@@ -16,8 +15,6 @@ gmt-gshhg
 gmt-dcw
 imagemagick
 jq
-libdbd-sqlite3-perl
-libdbi-perl
 libhtml-parser-perl
 libjson-perl
 librsvg2-bin
@@ -26,7 +23,6 @@ libwww-perl
 libxml-feed-perl
 libxml-rss-perl
 lighttpd
-lighttpd-mod-openssl
 logrotate
 media-types
 python3
@@ -38,4 +34,3 @@ python3-numpy
 python3-pandas
 python3-pyproj
 python3-requests
-

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail
 
 BASE="/opt/hamclock-backend"
@@ -36,6 +36,7 @@ sudo -u www-data "$VENV/bin/python3" -c "import dvoacap; print('dvoacap OK')"
 
 # HamClock-style smoke test using current script arguments only
 # (stderr debug is useful during install; stdout remains the HamClock-format table)
+# shellcheck disable=SC2024
 sudo -u www-data "$VENV/bin/python3" "$BASE/scripts/voacap_bandconditions.py" \
   --year 2026 --month 2 --utc 17 \
   --txlat 28.000 --txlng -81.000 \

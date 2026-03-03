@@ -5,64 +5,58 @@
 #######################################################
 # build voacap
 #######################################################
-FROM debian:13.3-slim AS build-voacap
+#FROM debian:13.3-slim AS build-voacap
+FROM dhi.io/debian-base:trixie-debian13-dev AS build-voacap
 
-USER root
 WORKDIR /opt
 
 # Install voap build prerequisites
 COPY docker/package-list-voacap.txt /opt
 COPY docker/dvoacap.tgz /opt
-COPY docker/ohb-maps.tar.zst /opt
 
-# Build the voacap artifacts and untar maps
-RUN apt update && \
-    apt install -y --no-install-recommends $(grep -v '^#' package-list-voacap.txt) && \
+# Build the voacap artifacts
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN apt-get update && \
+    grep -v '^#' package-list-voacap.txt | xargs -r apt-get install -y --no-install-recommends && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /opt/package-list-voacap.txt && \
     # \
-    # install voacap and then copy the artifacts into the main image \
+    # move this and packages into a build \
     tar xzf dvoacap.tgz && \
-    pip install dvoacap-python-main/. --break-system-packages && \
-    rm -Rf dvoacap-python-main && \
-    # \
-    # untar the maps so we don't get the tgz in the layers \
-    mkdir -p ohb-maps && \
-    tar -x --zstd -f ohb-maps.tar.zst -C ohb-maps --strip-components=1 maps/ && \
-    rm -Rf ohb-maps.tar.zst
+    pip install --no-cache-dir dvoacap-python-main/. --break-system-packages && \
+    rm -Rf dvoacap-python-main
 
 #######################################################
 # Build the real image
 #######################################################
-FROM debian:13.3-slim
+#FROM debian:13.3-slim
+#FROM dhi.io/debian-base:trixie-debian13-fips
+FROM dhi.io/debian-base:trixie-debian13-dev
 
-USER root
 WORKDIR /opt
 
 COPY docker/package-list.txt /opt
 
 # Install prerequisites
-RUN apt update && \
-    apt install -y --no-install-recommends $(grep -v '^#' package-list.txt) && \
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN apt-get update && \
+    grep -v '^#' package-list.txt | xargs -r apt-get install -y --no-install-recommends && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /opt/package-list.txt
 
 # the OHB tree
-COPY --exclude=docker/dvoacap.tgz --exclude=docker/ohb-maps.tar.zst . /opt/hamclock-backend/
+COPY . /opt/hamclock-backend/
 # Copy voacap after python was installed above
 COPY --from=build-voacap /usr/local/lib/python3.13/dist-packages/ /usr/local/lib/python3.13/dist-packages/
-COPY --from=build-voacap /opt/ohb-maps /opt/hamclock-backend/ham/HamClock/maps
 
 # Install hamclock-backend
-RUN cd /opt/hamclock-backend && \
-    # \
-    # make directory structure \
-    mkdir -p \
-        tmp \
-        logs \
-        cache \
-        data \
-        htdocs && \
+WORKDIR /opt/hamclock-backend
+RUN mkdir -p \
+    tmp \
+    logs \
+    cache \
+    data \
+    htdocs && \
     mv  docker/run.sh /opt && \
     # \
     # cron is tightly coupled to the type of python install. cron is written for pyenv. however \
@@ -87,11 +81,7 @@ RUN cd /opt/hamclock-backend && \
     chmod 600 /var/spool/cron/crontabs/www-data && \
     # \
     # set up logrotate \
-    mv logrotate/ohb.logrotate /etc/logrotate.d/ohb && \
-    mv logrotate/lighttpd.logrotate /etc/logrotate.d/lighttpd && \
-    chown root:root /etc/logrotate.d/ohb /etc/logrotate.d/lighttpd && \
-    # I like dates in the rotated filenames \
-    sed -i 's/^#dateext/dateext/' /etc/logrotate.conf && \
+    mv ohb.logrotate /etc/logrotate.d/ohb && \
     # \
     # set up lighttpd \
     cp lighttpd-conf/*.conf /etc/lighttpd/conf-available/ && \
@@ -99,10 +89,7 @@ RUN cd /opt/hamclock-backend && \
     /usr/sbin/lighttpd-enable-mod hamclock && \
     /usr/sbin/lighttpd-enable-mod ohb-dashboard && \
     /usr/sbin/lighttpd-enable-mod voacap-proxy && \
-    /usr/sbin/lighttpd-enable-mod ssl && \
-    openssl req -x509 -newkey rsa:4096 -sha256 -days 365 -nodes \
-        -keyout /etc/lighttpd/server.pem -out /etc/lighttpd/server.pem \
-        -subj "/C=US/ST=State/L=City/O=Organization/OU=IT/CN=localhost" && \
+    /usr/sbin/lighttpd-enable-mod security-headers && \
     # \
     # ImageMagick policy parameters need to be increased \
     sed -i 's/name="memory" value="[^"]*"/name="memory" value="2GiB"/' /etc/ImageMagick-?/policy.xml && \

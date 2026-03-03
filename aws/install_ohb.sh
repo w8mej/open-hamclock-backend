@@ -1,4 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/bash
+set -e
+
 
 REPO="https://github.com/BrianWilkinsFL/open-hamclock-backend.git"
 BASE="/opt/hamclock-backend"
@@ -243,18 +245,19 @@ sudo chown -R www-data:www-data "$BASE/etc"
 # ---------- python venv ----------
 STEP=$((STEP+1)); progress $STEP $STEPS
 echo -e "${BLU}==> Creating Python virtualenv${NC}"
+
+sudo -u www-data mkdir -p "$BASE/tmp/pip-cache"
 sudo -u www-data mkdir -p "$BASE/tmp/worldwx"
 sudo -u www-data mkdir -p "$BASE/tmp/mpl"
 
-sudo -u www-data env HOME="$BASE/tmp" XDG_CACHE_HOME="$BASE/tmp" \
-    python3 -m venv "$VENV" & spinner $!
+sudo -u www-data env HOME="$BASE/tmp" XDG_CACHE_HOME="$BASE/tmp" PIP_CACHE_DIR="$BASE/tmp/pip-cache" \
+python3 -m venv "$VENV" & spinner $!
 
-sudo -u www-data env HOME="$BASE/tmp" XDG_CACHE_HOME="$BASE/tmp" \
-    "$VENV/bin/pip" install --no-cache-dir --upgrade pip & spinner $!
+sudo -u www-data env HOME="$BASE/tmp" XDG_CACHE_HOME="$BASE/tmp" PIP_CACHE_DIR="$BASE/tmp/pip-cache" \
+"$VENV/bin/pip" install --upgrade pip & spinner $!
 
-sudo -u www-data env HOME="$BASE/tmp" XDG_CACHE_HOME="$BASE/tmp" \
-    "$VENV/bin/pip" install --no-cache-dir \
-    requests numpy pygrib matplotlib pandas scipy feedparser beautifulsoup4 lxml >/dev/null &
+sudo -u www-data env HOME="$BASE/tmp" XDG_CACHE_HOME="$BASE/tmp" PIP_CACHE_DIR="$BASE/tmp/pip-cache" \
+"$VENV/bin/pip" install requests numpy pygrib matplotlib pandas scipy feedparser beautifulsoup4 lxml >/dev/null &
 spinner $!
 
 # ---------- relocate ham ----------
@@ -378,6 +381,7 @@ sudo lighttpd -t -f /etc/lighttpd/lighttpd.conf
 
 # Disable conflicting javascript conf
 sudo lighttpd-disable-mod javascript-alias || true
+# shellcheck disable=SC2010
 if ls /etc/lighttpd/conf-enabled | grep -q javascript; then
   echo "javascript conf still enabled"
 else
@@ -412,7 +416,7 @@ echo -e "${GRN}lighttpd configured${NC}"
 STEP=$((STEP+1)); progress $STEP $STEPS
 echo -e "${BLU}==> Installing logrotate config${NC}"
 
-sudo cp "$BASE/logrotate/ohb.logrotate" /etc/logrotate.d/ohb
+sudo cp "$BASE/ohb.logrotate" /etc/logrotate.d/ohb
 sudo logrotate -d /etc/logrotate.conf
 
 # ---------- initial gen ----------
@@ -454,7 +458,7 @@ run_python_to_file() {
   # ensure parent dir exists and is writable by www-data
   install -d -o www-data -g www-data "$(dirname "$out")"
 
-  # run in foreground so we can do atomic replace; capture stderr to log
+  # shellcheck disable=SC2024
   if ! sudo -u www-data env \
       HOME="$BASE/tmp" \
       XDG_CACHE_HOME="$BASE/tmp" \
@@ -478,6 +482,7 @@ run_python() {
   local log="$BASE/logs/${f%.py}.log"
   echo -e "${YEL}Running $VENV/bin/python $f${NC}"
 
+  # shellcheck disable=SC2024
   sudo -u www-data env \
     HOME="$BASE/tmp" \
     XDG_CACHE_HOME="$BASE/tmp" \
@@ -494,6 +499,7 @@ run_perl() {
   local f=$1
   local log="$BASE/logs/${f%.pl}.log"
   echo -e "${YEL}Running perl $f${NC}"
+  # shellcheck disable=SC2024
   sudo -u www-data env OHB_SIZES="$OHB_SIZES" perl "$BASE/scripts/$f" >> "$log" 2>&1 &
   seed_spinner $!
 }
@@ -502,6 +508,7 @@ run_sh() {
   local f=$1
   local log="$BASE/logs/${f%.sh}.log"
   echo -e "${YEL}Running bash $f${NC}"
+  # shellcheck disable=SC2024
   sudo -u www-data env OHB_SIZES="$OHB_SIZES" bash "$BASE/scripts/$f" >> "$log" 2>&1 &
   seed_spinner $!
 }
@@ -510,6 +517,7 @@ run_flock_sh() {
   local f=$1
   local log="$BASE/logs/${f%.sh}.log"
   echo -e "${YEL}Running flocked $f${NC}"
+  # shellcheck disable=SC2024
   sudo -u www-data env OHB_SIZES="$OHB_SIZES" flock -n /tmp/update_sdo.lock bash "$BASE/scripts/$f" >> "$log" 2>&1 &
   seed_spinner $!
 }
@@ -530,7 +538,7 @@ run_sh  gen_contest-calendar.sh
 run_python kindex_simple.py
 run_sh  update_cloud_maps.sh
 run_sh  update_drap_maps.sh
-run_python  dst_simple.py
+run_sh  gen_dst.sh
 run_sh  fetch_tle.sh
 run_sh  gen_aurora.sh
 run_sh  gen_noaaswx.sh
@@ -540,6 +548,7 @@ run_sh  gen_cty_wt_mod.sh
 run_perl update_sota_cache.pl
 run_perl update_wwff_cache.pl
 run_perl gen_onta.pl
+run_python web15rss_fetch.py
 run_python  bz_simple.py
 run_python web15rss_fetch.py
 run_sh  gen_drap.sh
@@ -557,7 +566,7 @@ HOST=$(hostname)
 IP=$(hostname -I | awk '{print $1}')
 
 echo -e "${BLU}==> Integration test...${NC}"
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ham/HamClock/version.pl)
+HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost/ham/HamClock/version.pl)
 if [[ "$HTTP_CODE" == "200" ]]; then
   echo -e "${GRN}[✓] HTTP $HTTP_CODE - OK${NC}"
 else

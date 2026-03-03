@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 
 # Variables to set
 IMAGE_BASE=komacke/open-hamclock-backend
@@ -6,8 +8,8 @@ VOACAP_VERSION=v.0.7.6
 HTTP_PORT=80
 
 # Don't set anything past here
-TAG=$(git describe --exact-match --tags 2>/dev/null)
-if [ $? -ne 0 ]; then
+TAG=$(git describe --exact-match --tags 2>/dev/null || true)
+if [ -z "$TAG" ]; then
     echo "NOTE: Not currently on a tag. Using 'latest'."
     TAG=latest
     GIT_VERSION=$(git rev-parse --short HEAD)
@@ -51,11 +53,11 @@ main() {
     MULTI_PLATFORM=false
     NOCACHE=false
 
-    if [[ "$@" =~ --help ]]; then
+    if [[ "$*" =~ --help ]]; then
         usage
     fi
 
-    while getopts ":p:cmh" opt; do
+    while getopts ":mnh" opt; do
         case $opt in
             m)
                 MULTI_PLATFORM=true
@@ -85,13 +87,12 @@ do_all() {
     warn_image_tag
     warn_local_edits
     get_dvoacap
-    get_maps
     build_image
 }
 
 warn_image_tag() {
-    if [ $TAG != latest ]; then
-        if [ $MULTI_PLATFORM == true ]; then
+    if [ "$TAG" != "latest" ]; then
+        if [ "$MULTI_PLATFORM" == true ]; then
             docker manifest inspect $IMAGE >/dev/null
             if [ $? -eq 0 ]; then
                 echo
@@ -109,11 +110,11 @@ warn_image_tag() {
 
 warn_local_edits() {
     # check if there are local edits in the filesystem. We probably don't want to push them
-    git diff-index --quiet HEAD --
-    LOCAL_EDITS=$?
+    git diff-index --quiet HEAD -- || LOCAL_EDITS=$?
+    LOCAL_EDITS=${LOCAL_EDITS:-0}
 
-    if [ $LOCAL_EDITS -ne 0 ]; then
-        if [ $MULTI_PLATFORM == true ]; then
+    if [ "$LOCAL_EDITS" -ne 0 ]; then
+        if [ "$MULTI_PLATFORM" == true ]; then
             echo
             echo "ERROR: There are local edits. stash or reset them before pushing"
             echo "       images to Docker Hub."
@@ -124,7 +125,7 @@ warn_local_edits() {
             echo "         them and build again."
         fi
     fi
-    return $LOCAL_EDITS
+    return 0
 }
 
 get_dvoacap() {
@@ -132,14 +133,6 @@ get_dvoacap() {
         echo
         echo "Getting dvoacap-python from GitHub ..."
         curl -fsSL https://github.com/skyelaird/dvoacap-python/archive/refs/heads/main.tar.gz -o dvoacap.tgz
-    fi
-}
-
-get_maps() {
-    if [ ! -e ohb-maps.tar.zst ]; then
-        echo
-        echo "Getting ohb-maps from GitHub ..."
-        curl -fsSLO https://github.com/BrianWilkinsFL/open-hamclock-backend/releases/download/maps-v1/ohb-maps.tar.zst
     fi
 }
 

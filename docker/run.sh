@@ -1,23 +1,24 @@
 #!/bin/bash
+set -e
 
-echo "This image is based on git: '$(cat hamclock-backend/git.version)'"
+
+echo "This image is based on git: '$(cat hamclock-backend/git.version 2>/dev/null || echo unknown)'"
 echo "Start up time: $(date -u +%H:%M:%S)"
-
-echo "Preparing for pskr ..."
-mkdir -p /opt/hamclock-backend/htdocs/pskr
-chown $PSKR_UID /opt/hamclock-backend/htdocs/pskr
 
 echo "Syncing the initial, static directory structure ..."
 mkdir -p /opt/hamclock-backend/htdocs/ham
 cp -a /opt/hamclock-backend/ham/HamClock /opt/hamclock-backend/htdocs/ham
 if [ "$ENABLE_DASHBOARD" == true ]; then
-    echo Installing dashboard ...
     cp -a /opt/hamclock-backend/ham/dashboard/* /opt/hamclock-backend/htdocs
 else
-    echo Removing dashboard ...
-    find /opt/hamclock-backend/htdocs -maxdepth 1 -type f ! -name prime_crontabs.done -exec rm -f "{}" +
+    find /opt/hamclock-backend/htdocs -maxdepth 1 -type f -exec rm -f "{}" +
     cp /opt/hamclock-backend/ham/dashboard/favicon.ico /opt/hamclock-backend/htdocs
     cp /opt/hamclock-backend/ham/dashboard/ascii.txt /opt/hamclock-backend/htdocs
+fi
+
+if [ "$DISABLE_VOACAP_PROXY" == "true" ]; then
+    echo "Disabling VOACAP Proxy for testing ..."
+    rm -f /etc/lighttpd/conf-enabled/53-voacap-proxy.conf
 fi
 
 # start the web server
@@ -29,7 +30,8 @@ if [ ! -e /opt/hamclock-backend/htdocs/prime_crontabs.done ]; then
     echo "Running OHB for the first time."
 
     echo "Priming the data set ..."
-    /usr/sbin/runuser -u www-data /opt/hamclock-backend/prime_crontabs.sh
+    /usr/sbin/runuser -u www-data /opt/hamclock-backend/prime_crontabs.sh || \
+        echo "WARNING: Some priming tasks failed. They will retry via cron."
 
     touch /opt/hamclock-backend/htdocs/prime_crontabs.done
     echo "Done! OHB data has been primed."
@@ -43,7 +45,7 @@ else
 fi
 
 echo $LAST_TIME_EPOCH > /opt/last-ts-running.txt
-echo $(date -u +%s) > /opt/started-running.txt
+echo "$(date -u +%s)" > /opt/started-running.txt
 
 # start cron
 echo "Starting cron ..."
@@ -51,19 +53,5 @@ echo "Starting cron ..."
 
 echo "OHB is running and ready to use at: $(date -u +%H:%M:%S)"
 
-# this extra work causes the container to stop quickly. We need to 
-# kill our own jobs or bash will zombie and then docker takes 10 seconds
-# before it sends kill -9. The wait will respond to a TERM whereas 
-# tail does not so we need to background tail.
-cleanup() {
-    echo "Caught SIGTERM, shutting down services..."
-    kill $(jobs -p)
-    exit 0
-}
-
-# Trap the TERM signal
-trap cleanup SIGTERM
-
 # hold the script to keep the container running
-tail --pid=$(pidof cron) -f /dev/null &
-wait $!
+tail --pid="$(pidof cron)" -f /dev/null
