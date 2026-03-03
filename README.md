@@ -1,108 +1,30 @@
-# 🛟  📡 OHB — Open HamClock Backend
+# 🛟 OHB — Open HamClock Backend
 
-When the original backend went dark, the clocks didn’t have to. 
+When the original backend went dark, the clocks didn’t have to.
 
-## What is OHB?
-OHB is an open-source, backend replacement for HamClock. It maintains the HamClock interface by dynamically generating live propagation data, maps, and feeds. It can be hosted on compute as small as a Raspberry Pi3B+.
+Open-source, self-hostable backend replacement for HamClock — restoring live propagation data, maps, and feeds.
 
-## Overview
-Mitigates centralized backend risk by enabling deployment across multiple independent, federated instances. Continuity is guaranteed since OHB is open source and easily maintained.
+What's a backend? It is how HamClock got all of its data. Without a separate backend, all HamClock's will cease to function by June 2026.
 
-All maps + data feeds are generated on your own compute. 
+Drop-in compatible with existing HamClock's — no firmware changes required.
 
-Note: VOACAP DE-DX, VOACAP REL/TOA are in work.
+OHB provides faithful replacements for the data feeds and map assets
+that HamClock depends on — built by operators, for operators.
 
-## Cost
-The software is free to use and download. We do not take donations.
-
-## Feed Info
-All data feeds and maps are generated on your own compute. Backend selection always remains user-controlled - no lock-in to OHB if you change your mind.
-
-## What's a "backend"? 
-It is how HamClock got all of its data. Without a separate backend, all HamClock's might cease to function by June 2026. Switch now or switch later, your call. There is no rush if you are not comfortable.
-
-## Important Note
 > This project is not affiliated with HamClock or its creator,
 > Elwood Downey, WB0OEW.
 > We extend our sincere condolences to the Downey family.
 
-## ⚙️ What OHB Does
+## ✨ What OHB Does
 
-- Implements a self-hosted backend compatible with the HamClock backend interface
-- Rebuilds HamClock dynamic text feeds (solar, geomag, DRAP, PSK, RBN, WSPR, Amateur Satellites, DxNews, Contests, etc) all on your own hardware
-- Generates faithful HamClock-style map overlays (MUF-RT, DRAP, Aurora, Wx-mB, etc.) Note: Maps may vary slightly due to upstream model differences
-- Produces zlib-compressed BMP assets in multiple resolutions using the same specialized, RGB top down approach that is required by HamClock
+- Rebuilds HamClock dynamic text feeds (solar, geomag, DRAP, PSK, RBN, WSPR, Amateur Satellites, DxNews, Contests, etc)
+- Generates map overlays (MUF-RT, DRAP, Aurora, Wx-mB, etc.)
+- Produces zlib-compressed BMP assets in multiple resolutions
 - Designed for Raspberry Pi, cloud, or on-prem deployment
 - Fully open source and community maintained
-- Requires new, scalable PSK Reporter Fast Cache Service
 - Auto log rotation
 - Command and Control Dashboard (future)
-- Runs in Raspberry Pi 4, 5, PC, Virtual Machine, Bare Metal or Cloud
-  
-## 🧱 OHB Central Server (testing)
-These steps let you point a HamClock (or any client) at a shared OHB test server without self-hosting. This is a local-only change on your machine and is easy to revert.
-
-This is a test server and may be subject to unannounced or unplanned updates. 
-
-Important: Editing your hosts file overrides normal DNS for the specified hostname. After this change, anything on this computer that connects to clearskyinstitute.com will go to the OHB test server instead.
-
-### /etc/hosts file modification
-These steps will tell your system to not use clearskyinstitute.com if you do not use the -b option for local install. For now, **do not** use this option if you are self-hosting. This is a semi-permanent change.
-
-/etc/hosts doesn't persist after a reboot on Trixie.
-
-It's controlled by this line in /boot/firmware/user_data
-
-manage_etc_hosts: true
-
-It must be set to false, and then the Pi rebooted to take into effect so that /etc/hosts will persist. Set manage_etc_hosts to false and reboot before modifying your /etc/hosts file.
-
-```sudo nano /etc/hosts```
-
-Add this line:
-
-```44.32.64.64     clearskyinstitute.com```
-
-Save the file with CTRL+X
-
-Next, verify it is in effect
-
-```getent hosts clearskyinstitute.com```
-
-It should return
-
-```44.32.64.64     clearskyinstitute.com```
-
-Finally, you should be able to ping the re-directed host
-
-```ping -c 5 clearskyinstitute.com```
-
-It should say 100% and you should be able to restart your hamclock to connect to ohb.hamclock.app.
-
-### -b option
-
-HamClock version 4.22 has been tested with the -b option. You can connect without modifying your /etc/hosts file. This will allow you to switch between different backends and is the easiest option for most people. 
-
-In the directory where hamclock is installed, 
-
-```./hamclock -b ohb.hamclock.app:80```
-
-If unsure, you can type
-
-``which hamclock``
-
-and if hamclock is installed in your PATH on the system then it will tell you where the application is installed. From there, you can type the path to hamclock
-
-``/path/to/hamclock -b ohb.hamclock.app:80``
-
-/path/to/hamclock may vary on your system
-
-### Transitioning? Be sure to clear your .hamclock cache
-For users transitioning immediately from ClearSkyInstitute or another backend server, it is important that you clear these two file types to ensure you pull latest upon connecting to either your local backend or the central backend. This involves deleting *.bmp and *.txt from your .hamclock cache directory. Do not delete the eeprom file or you will lose your settings. 
-```
-rm /root/.hamclock/*.bmp /root/.hamclock/*.txt
-rm /home/*/.hamclock/*.txt /home/*/.hamclock/*.bmp
-```
+- Secure
 
 ## 🧭 Architecture
 ```
@@ -127,7 +49,7 @@ rm /home/*/.hamclock/*.txt /home/*/.hamclock/*.bmp
          | HamClock |
          +----------+
 ```
-## Compatibility 👉 [Compatibility](COMPATIBILITY.md)
+
 ## 💬 Join us on Discord
 We are building a community-powered backend to keep HamClock running. \
 Discord is where we can collaborate, troubleshoot, and exchange ideas — no RF license required 😎 \
@@ -136,9 +58,6 @@ https://discord.gg/wb8ATjVn6M
 # OHB in Production (Live HamClock Clients)
 
 ## Automatic AMSAT Satellite Updater Backend - Keep Your Satellites Fresh!
-
-Note: This will only list **ACTIVE** AMSAT satellites from the AMSAT Status Page.
-
 <img width="795" height="459" alt="image" src="https://github.com/user-attachments/assets/47ee3b6f-2075-42e2-a55f-618a0fb9fad5" />
 <img width="798" height="568" alt="image" src="https://github.com/user-attachments/assets/14b24350-c0a5-4b00-a36f-9c34c74fef3d" />
 <img width="799" height="568" alt="image" src="https://github.com/user-attachments/assets/f10d67f5-186c-43b6-b9d9-71149fd897f7" />
@@ -149,7 +68,6 @@ Note: This will only list **ACTIVE** AMSAT satellites from the AMSAT Status Page
 <img width="805" height="486" alt="image" src="https://github.com/user-attachments/assets/c59d485f-08ed-4bf6-85e1-aed5e4a6cabe" />
 <img width="822" height="505" alt="image" src="https://github.com/user-attachments/assets/0a0b8c73-293e-4723-a8ba-c32abdfa7bdd" />
 <img width="803" height="487" alt="image" src="https://github.com/user-attachments/assets/c507f348-bdda-4683-9473-796545067e0e" />
-<img width="816" height="490" alt="image" src="https://github.com/user-attachments/assets/99582cf9-9a89-4a37-ba31-7996156d2fc7" />
 
 ## 🚀 Quick Start 👉 [Quick Start Guide](QUICK_START.md)
 ## 📦 Installation 👉 [Detailed installation instructions](INSTALL.md)
@@ -169,12 +87,9 @@ As of today:
 👉 Full artifact tracking and integration status:
 [PROJECT_STATUS.md](PROJECT_STATUS.md) 
 ## 📚 Data Attribution 👉 [Attribution](ATTRIBUTION.md)
-All we ask is if you fork OHB that you clearly list what parts of OHB you re-used and what parts you changed.
-
 ## 🤝 Contributing
 Bug reports and pull requests are welcome on GitHub at
 https://github.com/BrianWilkinsFL/open-hamclock-backend/issues
-## 📄 Disclaimer 👉 [Disclaimer](./DISCLAIMER.md)
 ## Related
 - [ohb-pskreporter-proxy](https://github.com/BrianWilkinsFL/ohb-pskreporter-proxy)
 - [hamclock-proxy-lite](https://github.com/BrianWilkinsFL/hamclock-proxy-lite)
