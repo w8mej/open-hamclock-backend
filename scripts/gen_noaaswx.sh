@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 
 # By SleepyNinja
 
@@ -7,7 +9,7 @@ URL="https://services.swpc.noaa.gov/products/noaa-scales.json"
 OUTPUT_FILE="/opt/hamclock-backend/htdocs/ham/HamClock/NOAASpaceWX/noaaswx.txt"
 
 # Fetch the JSON data
-data=$(curl -s "$URL")
+data=$(curl -sf "$URL")
 
 # Function to extract scales for a specific key (R, S, or G) for indices 0, 1, 2, 3
 extract_scale() {

@@ -234,7 +234,7 @@ def fetch_rows(now_utc: datetime, timeout: int, debug: bool = False) -> List[Par
         df = build_last24(current_rows, now_utc=now_utc)
         if len(df) == 24:
             if debug:
-                print(f"[debug] source: current month only", file=sys.stderr)
+                print("[debug] source: current month only", file=sys.stderr)
             return current_rows
     except Exception:
         pass
@@ -259,7 +259,7 @@ def fetch_rows(now_utc: datetime, timeout: int, debug: bool = False) -> List[Par
     _ = build_last24(merged_rows, now_utc=now_utc)
 
     if debug:
-        print(f"[debug] source: merged previous+current months", file=sys.stderr)
+        print("[debug] source: merged previous+current months", file=sys.stderr)
 
     return merged_rows
 

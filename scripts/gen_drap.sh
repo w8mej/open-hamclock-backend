@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 
 THIS=$(basename $0)
 TMPFILE=$(mktemp /opt/hamclock-backend/cache/$THIS-XXXXX)
@@ -9,7 +11,7 @@ OUTPUT="/opt/hamclock-backend/htdocs/ham/HamClock/drap/stats.txt"
 LAST_DATE_FILE="/opt/hamclock-backend/htdocs/ham/HamClock/drap/last_valid_date.txt"
 
 # 1. Fetch the data into a variable to avoid multiple downloads
-RAW_DATA=$(curl -s "$URL")
+RAW_DATA=$(curl -sf "$URL")
 
 # 2. Extract the "Product Valid At" line
 # Example line: # Product Valid At : 2026-02-03 23:01 UTC

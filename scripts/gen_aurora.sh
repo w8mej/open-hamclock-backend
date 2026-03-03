@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 
 THIS=$(basename "$0")
 

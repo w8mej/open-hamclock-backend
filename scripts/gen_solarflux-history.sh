@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 
 # the last year of history in our seed history file
 LAST_YEAR_SEED=2025
@@ -17,7 +19,7 @@ URL="https://www.spaceweather.gc.ca/solar_flux_data/daily_flux_values/fluxtable.
 # forward data is added just one month at a time
 if [ ! -e "OUTPUT" ]; then
     cp $SEED_FILE $OUTPUT
-    curl -s "$URL" | awk -v lastyear="$LAST_YEAR_SEED" -v target="$TARGET_MONTH" '
+    curl -sf "$URL" | awk -v lastyear="$LAST_YEAR_SEED" -v target="$TARGET_MONTH" '
         # 1. Skip lines that are empty or contain headers (starting with # or non-numeric)
         # The data lines usually start with a Julian Date (large number).
         /^[[:space:]]*[0-9]/ {
@@ -47,7 +49,7 @@ if [ ! -e "OUTPUT" ]; then
         }
     ' | sort -V >> "$OUTPUT"
 else
-    curl -s "$URL" | awk -v m="$MONTH" -v y="$YEAR" -v target="$TARGET_MONTH" '
+    curl -sf "$URL" | awk -v m="$MONTH" -v y="$YEAR" -v target="$TARGET_MONTH" '
         # Skip headers
         /^[a-zA-Z]/ || /^-/ { next }
 

@@ -19,20 +19,20 @@ Fields used:
 import argparse
 import sys
 
-import numpy as np
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
-import pygrib
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+import pygrib  # noqa: E402
+from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 
-from hc_bmp import (
+from hc_bmp import (  # noqa: E402
     read_bmp_v4_rgb565_topdown,
     rgb565_to_rgb888,
     rgb888_to_rgb565,
     write_bmp_v4_rgb565_topdown,
 )
-from hc_zlib import zread, zwrite
+from hc_zlib import zread, zwrite  # noqa: E402
 
 
 def resize_nn(arr: np.ndarray, out_h: int, out_w: int) -> np.ndarray:
@@ -141,14 +141,6 @@ def parse_args():
     p.add_argument("--width", type=int, required=True)
     p.add_argument("--height", type=int, required=True)
     p.add_argument("--log-inventory", action="store_true", help="Print GRIB inventory")
-    p.add_argument(
-        "--units", choices=["mb", "inches"], default="mb",
-        help="Pressure unit for isobars: mb (millibars, default) or inches (inHg)",
-    )
-    p.add_argument(
-        "--map-type", default="Wx-mB",
-        help="Map type tag used in output filename, e.g. Wx-mB or Wx-in (default: Wx-mB)",
-    )
     return p.parse_args()
 
 
@@ -184,19 +176,6 @@ def main():
     )
     pr = g_pr.values / 100.0  # Pa -> hPa/mB
 
-    # Unit conversion for display
-    if args.units == "inches":
-        pr_display = pr * 0.02953  # hPa -> inHg
-        # Isobar levels in inHg spanning ~28.35-31.00 (equiv 960-1050 hPa)
-        p_display_levels = np.arange(28.35, 31.01, 0.10)
-        p_label_step = 0.30   # label every ~3 lines
-        p_fmt = "%.2f"
-    else:
-        pr_display = pr
-        p_display_levels = np.arange(960, 1046, 5)
-        p_label_step = 15     # label every 15 mB
-        p_fmt = "%d"
-
     g_u10 = pick_required(
         msgs,
         short_names=["10u", "ugrd"],
@@ -226,27 +205,21 @@ def main():
 
     t2m_c = t2m_k - 273.15
 
-    # ── Longitude alignment: roll raw GRIB arrays BEFORE resampling ──────────
-    # GFS runs 0->359.75 deg (1440 cols at 0.25 deg). The map base is centered
-    # on the prime meridian (-180->180). Roll so col-0 = -180 deg (= 180E in GFS).
-    # Done on the native grid before resize so sub-pixel accuracy is preserved.
-    # g_pr.lons is shape (nlat, nlon); row 0 gives the longitude sequence.
-    _, lons_grib_2d = g_pr.latlons()   # returns (lats, lons) as 2D arrays
-    lons_grib = lons_grib_2d[0]        # 1-D lon array for row 0
-    roll_col  = int(np.argmin(np.abs(lons_grib - 180.0)))
-    pr     = np.roll(pr,    roll_col, axis=1)
-    u10    = np.roll(u10,   roll_col, axis=1)
-    v10    = np.roll(v10,   roll_col, axis=1)
-    t2m_c  = np.roll(t2m_c, roll_col, axis=1)
-    # ─────────────────────────────────────────────────────────────────────────
-
     # Bilinear resample for smoother fields; reduce contour clutter with pressure-only blur.
-    pr_s  = resize_bilinear(pr_display, H, W)
-    u_s   = resize_bilinear(u10,   H, W)
-    v_s   = resize_bilinear(v10,   H, W)
+    pr_s = resize_bilinear(pr, H, W)
+    u_s = resize_bilinear(u10, H, W)
+    v_s = resize_bilinear(v10, H, W)
     t_s_c = resize_bilinear(t2m_c, H, W)
-    pr_s  = box_blur(pr_s, passes=2)
-    
+    pr_s = box_blur(pr_s, passes=2)
+
+    # Align GFS 0..360 longitude grid to map base centered at -180..180.
+    # Without this, weather overlays can appear shifted/wrapped (e.g., "mirrored" continents).
+    shift = W // 2
+    pr_s  = np.roll(pr_s,  shift, axis=1)
+    u_s   = np.roll(u_s,   shift, axis=1)
+    v_s   = np.roll(v_s,   shift, axis=1)
+    t_s_c = np.roll(t_s_c, shift, axis=1)
+
     scale = max(W / 660.0, 1.0)
 
     # Pressure labels / lines (reduced clutter)
@@ -285,14 +258,14 @@ def main():
     ct = ax.contour(t_s_c, levels=t_label_levels, colors="none", linewidths=0.0)
     ax.clabel(ct, inline=True, fmt="%d", fontsize=t_fs, colors="white")
 
-    # Isobars: unit-aware levels and labels
-    cs = ax.contour(pr_s, levels=p_display_levels, colors="white", linewidths=lw, alpha=0.85)
-    label_levels = [
-        lv for lv in cs.levels
-        if abs(round(lv / p_label_step) * p_label_step - lv) < (p_label_step * 0.01)
-    ]
+    # Isobars: draw every 5 mB, label only every 15 mB (matches sparse look)
+    p_levels = np.arange(960, 1046, 5)
+    cs = ax.contour(pr_s, levels=p_levels, colors="white", linewidths=lw, alpha=0.85)
+
+    p_label_levels = np.arange(955, 1051, 15)  # ...970,985,1000,1015,1030...
+    label_levels = [lv for lv in p_label_levels if np.any(np.isclose(cs.levels, lv))]
     if label_levels:
-        ax.clabel(cs, levels=label_levels, inline=True, fmt=p_fmt, fontsize=fs, colors="white")
+        ax.clabel(cs, levels=label_levels, inline=True, fmt="%d", fontsize=fs, colors="white")
 
     # Wind direction arrows (uniform size, direction-only)
     yy, xx = np.mgrid[0:H:step, 0:W:step]
@@ -343,7 +316,7 @@ def main():
     img = rgba[:, :, :3].copy()
     plt.close(fig)
 
-    out_bmp = f"{args.outdir}/map-{args.tag}-{W}x{H}-{args.map_type}.bmp"
+    out_bmp = f"{args.outdir}/map-{args.tag}-{W}x{H}-Wx-mB.bmp"
     out_z = out_bmp + ".z"
 
     arr565 = rgb888_to_rgb565(img)

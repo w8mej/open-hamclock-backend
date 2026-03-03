@@ -106,8 +106,6 @@ def get_swpc_json_today(url: str, today_utc) -> Optional[int]:
     if not isinstance(data, list):
         return None
 
-    today_str = today_utc.isoformat()
-
     for obj in reversed(data):
        if not isinstance(obj, dict):
           continue
@@ -201,9 +199,9 @@ def main() -> int:
                 today_src = "silso"
         except Exception:
             pass
-    
+
     if today_ssn is not None:
-        
+
         combined = combined[combined["date"] != today_utc]
         combined = pd.concat(
             [combined, pd.DataFrame([{"date": today_utc, "ssn": int(today_ssn), "src": today_src}])],

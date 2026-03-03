@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 
 FILE="/opt/hamclock-backend/htdocs/ham/HamClock/aurora/aurora.txt"
 EXPECTED=48

@@ -37,7 +37,7 @@ def main():
             bz = float(d[3])
             bt = float(d[6])
             samples.append((t, bx, by, bz, bt))
-        except:
+        except Exception:
             continue
 
     if not samples:

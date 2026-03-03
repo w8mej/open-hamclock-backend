@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
+set -e
+
 set -uo pipefail
 
 # Get our directory locations in order
-HERE="$(realpath -s "$(dirname "$0")")"
+HERE="$(cd "$(dirname "$0")" && pwd)"
 THIS="$(basename "$0")"
 
 # the file with the list of paths to pull is the same as this script
@@ -38,17 +40,15 @@ cat /dev/null > $SOURCE_FILE.tmp
 while IFS= read -r line || [[ -n "$line" ]]; do
     KEEP_FILE=yes
     OUT_FILE=${OUT}${line}
-    if [[ ! "$line" =~ ^/ham/HamClock/ ]]; then
-        KEEP_FILE=no
-    elif [ -e $OUT_FILE -a -e $OUT_FILE.md5 ]; then
+    if [ -e "$OUT_FILE" ] && [ -e "$OUT_FILE.md5" ]; then
         LAST_MD5="$(cat $OUT_FILE.md5)"
         CURRENT_MD5="$(stat -c "%a %u %g %s %Y" $OUT_FILE | md5sum)"
         if [ "$LAST_MD5" != "$CURRENT_MD5" ]; then
             KEEP_FILE=no
         fi
-    elif [ ! -e $OUT_FILE -a ! -e $OUT_FILE.md5 ]; then
+    elif [ ! -e "$OUT_FILE" ] && [ ! -e "$OUT_FILE.md5" ]; then
         KEEP_FILE=yes
-    elif [ -e $OUT_FILE -o ! -e $OUT_FILE.md5 ]; then
+    elif [ -e "$OUT_FILE" ] || [ ! -e "$OUT_FILE.md5" ]; then
         KEEP_FILE=no
     fi
     if [ $KEEP_FILE == yes ]; then

@@ -7,16 +7,9 @@ set -euo pipefail
 export GMT_USERDIR=/opt/hamclock-backend/tmp
 cd "$GMT_USERDIR"
 
-PYTHON_BIN="/opt/hamclock-backend/venv/bin/python3"
-if [ ! -x "$PYTHON_BIN" ]; then
-    PYTHON_BIN="/usr/bin/python3"
-fi
-
 source "/opt/hamclock-backend/scripts/lib_sizes.sh"
 ohb_load_sizes
 echo "Building sizes: ${OHB_SIZES_NORM}"
-
-gmt set GMT_GRAPHICS_FORMAT png
 
 MUFD_URL="https://prop.kc2g.com/renders/current/mufd-normal-now.geojson"
 STAS_URL="https://prop.kc2g.com/api/stations.json"
@@ -148,14 +141,14 @@ for SZ in "${SIZES[@]}"; do
   J="Q0/${W_IN}i"
 
   gmt begin "$BASE" png E100
-    gmt set MAP_FRAME_TYPE=plain MAP_FRAME_WIDTH=0p MAP_FRAME_PEN=0p,white
+    gmt set MAP_FRAME_TYPE=plain
     # Black base
-    gmt coast -R${R} -J${J} -Gblack -Sblack -Dc --MAP_FRAME_PEN=0p
+    gmt coast -R${R} -J${J} -Gblack -Sblack -B0 -Dc
     # MUF heatmap
     gmt grdimage mufd.grd -R${R} -J${J} -C${CPT} -Q
     # Day white veil (D maps only)
     if [[ "$DN" == "D" ]]; then
-      gmt coast -R${R} -J${J} -Gwhite -Swhite -Dc -t80 --MAP_FRAME_PEN=0p
+      gmt coast -R${R} -J${J} -Gwhite -Swhite -B0 -Dc -t80
     fi
     # Coastlines + borders
     gmt coast -R${R} -J${J} -W${COAST_PT}p,black -N1/${BORDER_PT}p,black -Dc
@@ -232,6 +225,4 @@ done
 rm -f mufd.geojson stations.json mufd_grid.xyz mufd.grd \
       stations_circles.txt stations_labels.txt
 
-echo "Sleeping for 30 seconds..."
-sleep 30
 echo "Done."

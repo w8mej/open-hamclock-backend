@@ -30,7 +30,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 from urllib.request import Request, urlopen
 
 

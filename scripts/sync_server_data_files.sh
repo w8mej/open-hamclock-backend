@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 
 # --- Configuration ---
 # Ensure this path is correct for your Docker volume

@@ -22,7 +22,6 @@ import struct
 import sys
 import time
 import zlib
-from collections import deque
 from io import BytesIO
 from urllib.request import Request, urlopen
 
@@ -31,7 +30,7 @@ try:
 except ImportError:
     np = None
 
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont
 
 
 KC2G_STATIONS_JSON = "https://prop.kc2g.com/api/stations.json"

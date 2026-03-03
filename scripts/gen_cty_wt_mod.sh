@@ -1,11 +1,13 @@
 #!/bin/bash
+set -e
+
 
 THIS=$(basename $0)
 
 OUTFILE=/opt/hamclock-backend/htdocs/ham/HamClock/cty/cty_wt_mod-ll-dxcc.txt
 URL="https://www.country-files.com/cty/cty_wt_mod.dat"
 
-CTY_WX_MOD_BODY=$(curl -s $URL)
+CTY_WX_MOD_BODY=$(curl -sf $URL)
 SOURCE_VERSION=$(echo "$CTY_WX_MOD_BODY" | head -n 3 | sed -n 's/^.*RELEASE\s\+\([0-9.]\+\).*$/\1/p')
 EXTRACTED_TIME=$(date "+%a %b %d %H:%M:%S %YZ")
 if [ -e $OUTFILE ]; then

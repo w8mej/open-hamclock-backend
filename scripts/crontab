@@ -33,31 +33,34 @@ VIRTUAL_ENV=/opt/hamclock-backend/venv
 HOME=/var/www
 XDG_CACHE_HOME=/opt/hamclock-backend/tmp
 MPLCONFIGDIR=/opt/hamclock-backend/tmp/mpl
-PATH=/opt/hamclock-backend/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/hamclock-backend/venv/bin
 LC_ALL=C
 LANG=C
 CRON_TZ=UTC
 
-15 10,14 * * * $VENV/bin/python3 $BASE/scripts/ssn_simple.py            >> $BASE/logs/ssn_simple.log 2>&1
-*/5 * * * *    $VENV/bin/python3 $BASE/scripts/swind_simple.py          >> $BASE/logs/gen_swind_24hr.log 2>&1
-*/10 * * * *   $VENV/bin/python3 $BASE/scripts/bz_simple.py             >> $BASE/logs/bz_simple.log 2>&1
-*/30 * * * *   $VENV/bin/python3 $BASE/scripts/flux_simple.py           >> $BASE/logs/flux_simple.log 2>&1
-*/5 * * * *    $VENV/bin/python3 $BASE/scripts/xray_simple.py           >> $BASE/logs/xray_simple.log 2>&1
-19 * * * *     $VENV/bin/python3 $BASE/scripts/kindex_simple.py         >> $BASE/logs/kindex_simple.log 2>&1
-* */3 * * *    $VENV/bin/python3 $BASE/scripts/dst_simple.py            >> $BASE/logs/dst_simple.log 2>&1
-35 0 * * *     $VENV/bin/python3 $BASE/scripts/gen_dxpeditions_spots.py >> $BASE/logs/dxpeds.log 2>&1
+15 10,14 * * * $VENV/bin/python3 $BASE/scripts/ssn_simple.py    >> $BASE/logs/ssn_simple.log 2>&1
+*/5 * * * *    $VENV/bin/python3 $BASE/scripts/swind_simple.py  >> $BASE/logs/gen_swind_24hr.log 2>&1
+*/10 * * * *   $VENV/bin/python3 $BASE/scripts/bz_simple.py     >> $BASE/logs/bz_simple.log 2>&1
+*/30 * * * *   $VENV/bin/python3 $BASE/scripts/flux_simple.py   >> $BASE/logs/flux_simple.log 2>&1
+*/5 * * * *    $VENV/bin/python3 $BASE/scripts/xray_simple.py   >> $BASE/logs/xray_simple.log 2>&1
+5 */3 * * *    $VENV/bin/python3 $BASE/scripts/kindex_simple.py >> $BASE/logs/kindex_simple.log 2>&1
+* */3 * * *    $VENV/bin/python3 $BASE/scripts/dst_simple.py    >> $BASE/logs/dst_simple.log 2>&1
 
-0 1 * * *      $BASE/scripts/gen_solarflux-history.sh   >> /opt/hamclock-backend/logs/gen_solarflux-history.log 2>&1
-0 1 * * *      $BASE/scripts/gen_ssn_history.pl         >> /opt/hamclock-backend/logs/gen_ssn_history.pl 2>&1
-15 3 * * 0     $BASE/scripts/update_pota_parks_cache.sh >> /opt/hamclock-backend/logs/update_pota_parks_cache.log 2>&1
+0 1 * * * /opt/hamclock-backend/scripts/gen_solarflux-history.sh >> /opt/hamclock-backend/logs/gen_solarflux-history.log 2>&1
+0 1 * * * /opt/hamclock-backend/scripts/gen_ssn_history.pl >> /opt/hamclock-backend/logs/gen_ssn_history.pl 2>&1
+15 3 * * 0 /opt/hamclock-backend/scripts/update_pota_parks_cache.sh >> /opt/hamclock-backend/logs/update_pota_parks_cache.log 2>&1
 
-*/30 * * * *   $VENV/bin/python3 $BASE/scripts/web15rss_fetch.py >> $BASE/logs/web15rss_fetch.log 2>&1
+*/30 * * * * $VENV/bin/python3 $BASE/scripts/web15rss_fetch.py >> $BASE/logs/web15rss_fetch.log 2>&1
 
-5 */8 * * *    $BASE/scripts/gen_contest-calendar.sh    >> /opt/hamclock-backend/logs/gen_contest-calendar.log 2>&1
+# these 3 work together so stagger runs
+25 0 * * * /opt/hamclock-backend/scripts/gen_dxnews.pl >> /opt/hamclock-backend/logs/gen_dxnews.log 2>&1
+30 0 * * * /opt/hamclock-backend/scripts/gen_ng3k.pl >> /opt/hamclock-backend/logs/gen_ng3k.log 2>&1
+35 0 * * * /opt/hamclock-backend/scripts/merge_dxpeditions.pl >> /opt/hamclock-backend/logs/merge_dxpeditions.log 2>&1
 
-# Runs AMSAT Active Satellite Filter and builds TLEs
-0 */2 * * *    $BASE/scripts/fetch_tle.sh               >> /opt/hamclock-backend/logs/fetch_tle.log 2>&1
+5 */8 * * * /opt/hamclock-backend/scripts/gen_contest-calendar.sh >> /opt/hamclock-backend/logs/gen_contest-calendar.log 2>&1
 
+0 */2 * * * /opt/hamclock-backend/scripts/fetch_tle.sh >> /opt/hamclock-backend/logs/fetch_tle.log 2>&1
+20,50 * * * * /opt/hamclock-backend/scripts/gen_dst.sh >> /opt/hamclock-backend/logs/gen_dst.log 2>&1
 # Give NOAA time to breathe
 2,32 * * * * /opt/hamclock-backend/scripts/gen_aurora.sh >> /opt/hamclock-backend/logs/gen_aurora.log 2>&1
 # Optional watchdog
@@ -73,16 +76,16 @@ CRON_TZ=UTC
 
 20 2 * * * /opt/hamclock-backend/scripts/gen_cty_wt_mod.sh >> /opt/hamclock-backend/logs/gen_cty_wt_mod.sh 2>&1
 
-*/30 * * * * flock -n /tmp/update_sdo.lock /opt/hamclock-backend/scripts/update_all_sdo.sh >> /opt/hamclock-backend/logs/update_all_sdo.log 2>&1
+*/30 * * * * flock -n /opt/hamclock-backend/tmp/update_sdo.lock /opt/hamclock-backend/scripts/update_all_sdo.sh >> /opt/hamclock-backend/logs/update_all_sdo.log 2>&1
 
 # maps
-10,40 * * * *          /opt/hamclock-backend/scripts/kc2g_muf_heatmap.sh    >> /opt/hamclock-backend/logs/kc2g_muf_heatmap.log   2>&1
-20 */3 * * *           /opt/hamclock-backend/scripts/update_cloud_maps.sh   >> /opt/hamclock-backend/logs/update_cloud_maps.log  2>&1
-35 * * * *             /opt/hamclock-backend/scripts/update_drap_maps.sh    >> /opt/hamclock-backend/logs/update_drap_maps.log   2>&1
-5 1,5,9,13,17,21 * * * /opt/hamclock-backend/scripts/update_aurora_maps.sh  >> /opt/hamclock-backend/logs/update_aurora_maps.log 2>&1
-0 0,12 * * *           /opt/hamclock-backend/scripts/update_wx_mb_maps.sh   >> /opt/hamclock-backend/logs/update_wx_mb_maps.log  2>&1
+*/15 * * * * /opt/hamclock-backend/scripts/kc2g_muf_heatmap.sh >> /opt/hamclock-backend/logs/kc2g_muf_heatmap.log 2>&1
+0 */3 * * * /opt/hamclock-backend/scripts/update_cloud_maps.sh >> /opt/hamclock-backend/logs/update_cloud_maps.log 2>&1
+7,37 * * * * /opt/hamclock-backend/scripts/update_drap_maps.sh >> /opt/hamclock-backend/logs/update_drap_maps.log 2>&1
+6,30 * * * * /opt/hamclock-backend/scripts/update_aurora_maps.sh >> /opt/hamclock-backend/logs/update_aurora_maps.log 2>&1
+15 0,6,12,18 * * * /opt/hamclock-backend/scripts/update_wx_mb_maps.sh >> /opt/hamclock-backend/logs/update_wx_mb_maps.log 2>&1
 
 */5 * * * * OPENMETEO_CHUNK=50 OPENMETEO_REQS_PER_RUN=1 /usr/bin/perl /opt/hamclock-backend/scripts/update_world_wx.pl >>/opt/hamclock-backend/logs/worldwx.log 2>&1
 
 # This script will be removed when clearskyinstitute ceases to operate.
-#55 * * * * /opt/hamclock-backend/scripts/get-missing-from-csi.sh >> /opt/hamclock-backend/logs/get-missing-from-csi.log 2>&1
+55 * * * * /opt/hamclock-backend/scripts/get-missing-from-csi.sh >> /opt/hamclock-backend/logs/get-missing-from-csi.log 2>&1

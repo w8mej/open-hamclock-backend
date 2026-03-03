@@ -16,7 +16,14 @@ Direct Python port of k4drw/hamclock-next PropEngine.cpp with:
 Color scale matches HamClock REL bar:
   0%=#606460  ~30%=red  ~60%=yellow  100%=green
 """
-import argparse, hashlib, io, json, math, os, sys, time
+import argparse
+import hashlib
+import io
+import json
+import math
+import os
+import sys
+import time
 from pathlib import Path
 import numpy as np
 
@@ -340,8 +347,10 @@ def render_map(tx_lat, tx_lng, utc_hour, month, ssn, sfi, k_index,
     lng2d, lat2d = np.meshgrid(lngs, lats)   # (H,W)
 
     # Distance TX → every pixel
-    la1r = math.radians(tx_lat); lo1r = math.radians(tx_lng)
-    la2r = np.radians(lat2d);    lo2r = np.radians(lng2d)
+    la1r = math.radians(tx_lat)
+    lo1r = math.radians(tx_lng)
+    la2r = np.radians(lat2d)
+    lo2r = np.radians(lng2d)
     a    = (np.sin((la2r-la1r)/2)**2 +
             math.cos(la1r)*np.cos(la2r)*np.sin((lo2r-lo1r)/2)**2)
     dist = 2*R_EARTH*np.arcsin(np.sqrt(np.clip(a, 0, 1)))
@@ -450,7 +459,8 @@ def main():
     if args.cache_ttl > 0 and cp.exists():
         age = time.time() - cp.stat().st_mtime
         if age < args.cache_ttl:
-            if args.timing: print(f"Cache hit ({age:.0f}s old)", file=sys.stderr)
+            if args.timing:
+                print(f"Cache hit ({age:.0f}s old)", file=sys.stderr)
             data = cp.read_bytes()
             (sys.stdout.buffer if args.output=='-' else open(args.output,'wb')).write(data)
             return

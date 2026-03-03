@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
+set -e
+
 # lib_sizes.sh - shared size selection for OHB map generators
 
 # Canonical default list (keep in sync with HamClock)
 # The sizes are listed in map_sizes.txt. Empty Lines and
 # comments are ignored.
 
-echo "$(dirname "$BASH_SOURCE[0]}")/map_sizes.txt"
+echo "$(dirname "${BASH_SOURCE[0]}")/map_sizes.txt"
 
 mapfile -t DEFAULT_SIZES < <(sed -e '/^[[:blank:]]*#/d' -e '/^[[:blank:]]*$/d' "$(dirname "${BASH_SOURCE[0]}")/map_sizes.txt")
 

@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 
 URL="https://contestcalendar.com/weeklycontcustom.php"
 OUTPUT_FILE="/opt/hamclock-backend/htdocs/ham/HamClock/contests/contests311.txt"
@@ -7,7 +9,7 @@ OUTPUT_FILE="/opt/hamclock-backend/htdocs/ham/HamClock/contests/contests311.txt"
 echo "WA7BNM Weekend Contests" > "$OUTPUT_FILE"
 
 # Process the data and append to the file
-curl -s "$URL" | tr -d '\r' | awk '
+curl -sf "$URL" | tr -d '\r' | awk '
   /^BEGIN:VEVENT/ {printf "EVENT|"}
   /^DTSTART:/ {split($0, a, ":"); printf "%s|", a[2]}
   /^DTEND:/   {split($0, a, ":"); printf "%s|", a[2]}

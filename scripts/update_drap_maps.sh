@@ -105,108 +105,101 @@ open(sys.argv[2], 'wb').write(zlib.compress(data, 9))
 " "$in" "$out"
 }
 
-# Combined: apply Day haze (if needed), resize, convert to BMPv4 RGB565 top-down.
-# Uses Pillow — no ImageMagick, no policy limits, no intermediate files.
+# Write BMPv4 (BITMAPV4HEADER), 16bpp RGB565, top-down — matches ClearSkyInstitute format
 make_bmp_v4_rgb565_topdown() {
-  local inpng="$1" outbmp="$2" W="$3" H="$4" DN="$5"
-  python3 - <<'PY' "$inpng" "$outbmp" "$W" "$H" "$DN"
+  local inraw="$1" outbmp="$2" W="$3" H="$4"
+  python3 - <<'PY' "$inraw" "$outbmp" "$W" "$H"
 import struct, sys
-from PIL import Image
+inraw, outbmp, W, H = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
 
-inpng, outbmp, W, H, DN = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), sys.argv[5]
+raw = open(inraw, "rb").read()
+exp = W*H*3
+if len(raw) != exp:
+    raise SystemExit(f"RAW size {len(raw)} != expected {exp}")
 
-img = Image.open(inpng).convert("RGB")
-
-# Resize to exact target if GMT didn't produce the right dimensions
-if img.size != (W, H):
-    img = img.resize((W, H), Image.LANCZOS)
-
-# Apply day haze: 205/220/205 at 20% opacity
-if DN == "D":
-    overlay = Image.new("RGB", img.size, (205, 220, 205))
-    img = Image.blend(img, overlay, alpha=0.20)
-
-pixels = img.tobytes()  # raw RGB, top-down
-
-# Encode RGB888 -> RGB565 LE
-pix = bytearray(W * H * 2)
+pix = bytearray(W*H*2)
 j = 0
-for i in range(0, len(pixels), 3):
-    r, g, b = pixels[i], pixels[i+1], pixels[i+2]
+for i in range(0, len(raw), 3):
+    r = raw[i]; g = raw[i+1]; b = raw[i+2]
     v = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)
-    pix[j]   = v & 0xFF
-    pix[j+1] = (v >> 8) & 0xFF
+    pix[j:j+2] = struct.pack("<H", v)
     j += 2
 
-# BMPv4 header (BITMAPV4HEADER = 108 bytes)
 bfOffBits = 14 + 108
-bfSize    = bfOffBits + len(pix)
-filehdr   = struct.pack("<2sIHHI", b"BM", bfSize, 0, 0, bfOffBits)
+bfSize = bfOffBits + len(pix)
+filehdr = struct.pack("<2sIHHI", b"BM", bfSize, 0, 0, bfOffBits)
 
+biSize = 108
 rmask, gmask, bmask, amask = 0xF800, 0x07E0, 0x001F, 0x0000
+cstype = 0x73524742  # sRGB
+endpoints = b"\x00"*36
+gamma = b"\x00"*12
+
 v4hdr = struct.pack("<IiiHHIIIIII",
-    108,        # biSize
-    W, -H,      # negative height = top-down
-    1, 16,      # planes, bpp
-    3,          # BI_BITFIELDS compression
-    len(pix),   # image size
-    0, 0, 0, 0  # pels/meter, clr used/important
-)
-v4hdr += struct.pack("<IIII", rmask, gmask, bmask, amask)
-v4hdr += struct.pack("<I", 0x73524742)  # sRGB color space
-v4hdr += b"\x00" * 48                  # endpoints + gamma
+    biSize, W, -H, 1, 16, 3, len(pix), 0, 0, 0, 0
+) + struct.pack("<IIII", rmask, gmask, bmask, amask) \
+  + struct.pack("<I", cstype) + endpoints + gamma
 
 with open(outbmp, "wb") as f:
     f.write(filehdr)
     f.write(v4hdr)
     f.write(pix)
-
-print(f"  -> Done: {outbmp}")
 PY
 }
 
 echo "Rendering DRAP maps..."
 
-render_one() {
-  local DN="$1" SZ="$2"
-  local W=${SZ%x*}
-  local H=${SZ#*x}
-  local BASE="$GMT_USERDIR/drap_${DN}_${SZ}"
-  local PNG="${BASE}.png"
-  local BMP="$OUTDIR/map-${DN}-${SZ}-DRAP-S.bmp"
-
-  echo "  -> ${DN} ${SZ}"
-
-  # Render at 72 DPI so 1 point = 1 pixel; -JQ0/${W}p produces exactly W pixels wide.
-  gmt begin "$BASE" png E72
-    gmt coast -R-180/180/-90/90 -JQ0/${W}p -Gblack -Sblack -A10000
-
-    if [ "$NPTS" -gt 0 ]; then
-      gmt grdimage drap.nc -Cdrap.cpt -Q -n+b -t25
-    fi
-
-    # White linework only (transparent interiors)
-    gmt coast -R-180/180/-90/90 -JQ0/${W}p -W0.5p,white -N1/0.4p,white -A10000
-  gmt end || { echo "  !! gmt failed for $DN $SZ"; return 1; }
-
-  # Haze + resize + RGB565 BMP — all in one Pillow pass, no ImageMagick
-  make_bmp_v4_rgb565_topdown "$PNG" "$BMP" "$W" "$H" "$DN" \
-    || { echo "  !! bmp write failed for $DN $SZ"; return 1; }
-
-  zlib_compress "$BMP" "${BMP}.z"
-  rm -f "$PNG"
-}
-
-# Render D and N bands in parallel; sizes within each band are sequential
-# to avoid thrashing RAM on the Pi 3B.
 for DN in D N; do
-  (
-    for SZ in "${SIZES[@]}"; do
-      render_one "$DN" "$SZ"
-    done
-  ) &
+  for SZ in "${SIZES[@]}"; do
+    W=${SZ%x*}
+    H=${SZ#*x}
+    BASE="$GMT_USERDIR/drap_${DN}_${SZ}"
+    PNG="${BASE}.png"
+    PNG_HAZE="${BASE}_haze.png"
+    PNG_FIXED="${BASE}_fixed.png"
+    BMP="$OUTDIR/map-${DN}-${SZ}-DRAP-S.bmp"
+
+    echo "  -> ${DN} ${SZ}"
+
+    # Render Day and Night identically in GMT (black base + DRAP + white borders)
+    gmt begin "$BASE" png
+      gmt coast -R-180/180/-90/90 -JQ0/${W}p -Gblack -Sblack -A10000
+
+      if [ "$NPTS" -gt 0 ]; then
+        gmt grdimage drap.nc -Cdrap.cpt -Q -n+b -t25
+      fi
+
+      # White linework only (transparent interiors)
+      gmt coast -R-180/180/-90/90 -JQ0/${W}p -W0.5p,white -N1/0.4p,white -A10000
+    gmt end || { echo "gmt failed for $DN $SZ"; continue; }
+
+    # Apply Day haze as a post-process (avoids GMT layer-order/fill issues)
+
+        # Apply Day haze as a post-process (avoids GMT layer-order/fill issues)
+    if [[ "$DN" == "D" ]]; then
+      # Build overlay from the actual rendered PNG dimensions so it covers the full image.
+      # 205/220/205 at 20% opacity over black ~= #292C29 on empty areas.
+      convert "$PNG" \
+        \( +clone -fill "rgb(205,220,205)" -colorize 100 -alpha set -channel A -evaluate set 20% +channel \) \
+        -compose over -composite \
+        "$PNG_HAZE" || { echo "day haze failed for $DN $SZ"; continue; }
+    else
+      cp -f "$PNG" "$PNG_HAZE" || { echo "copy failed for $DN $SZ"; continue; }
+    fi
+    convert "$PNG_HAZE" -resize "${SZ}!" "$PNG_FIXED" || { echo "resize failed for $DN $SZ"; continue; }
+
+    # Extract raw RGB then write proper BMPv4 RGB565 matching ClearSkyInstitute format
+    RAW="$GMT_USERDIR/drap_${DN}_${SZ}.raw"
+    convert "$PNG_FIXED" RGB:"$RAW" || { echo "raw extract failed for $DN $SZ"; continue; }
+    make_bmp_v4_rgb565_topdown "$RAW" "$BMP" "$W" "$H" || { echo "bmp write failed for $DN $SZ"; continue; }
+    rm -f "$RAW"
+
+    zlib_compress "$BMP" "${BMP}.z"
+
+    rm -f "$PNG" "$PNG_HAZE" "$PNG_FIXED"
+    echo "  -> Done: $BMP"
+  done
 done
-wait
 
 rm -f drap_nn.nc drap_s1.nc drap.nc drap.cpt drap.xyz "$TXT"
 

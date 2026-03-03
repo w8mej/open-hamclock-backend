@@ -21,7 +21,7 @@ Notes:
 
 import sys
 import argparse
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 import numpy as np
 from dvoacap.path_geometry import GeoPoint
@@ -276,7 +276,7 @@ def build_engine(tx: GeoPoint, args, effective_required_snr: float, effective_ba
 
 def predict_row_for_hour(tx: GeoPoint, rx: GeoPoint, hour: int, args, effective_required_snr: float, effective_bandwidth_hz: float) -> List[float]:
     frequencies = [f for _, f in BANDS]
-   
+
     engine = build_engine(tx, args, effective_required_snr, effective_bandwidth_hz)
 
     utc_time = (hour % 24) / 24.0  # dvoacap docs use fractional day (e.g. 12:00 -> 0.5)
@@ -322,7 +322,7 @@ def predict_row_for_hour(tx: GeoPoint, rx: GeoPoint, hour: int, args, effective_
         row.append(0.0)
 
     row = apply_band_correction(row)
-    
+
     # HamClock expects 9 columns; append placeholder
     row.append(0.0)
     return row

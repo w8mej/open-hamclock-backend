@@ -3,9 +3,8 @@
 #
 # Build HamClock geomag/kindex.txt (72 lines) from SWPC:
 # - daily-geomagnetic-indices.txt -> most recent 56 valid observed Planetary Kp bins
-# - 3-day-geomag-forecast.txt -> 16 forecast Kp bins using a dynamic window:
-#     start at the NEXT 3-hour bin after current UTC time, column-major,
-#     always producing exactly 16 forecast values.
+# - 3-day-geomag-forecast.txt -> 16 forecast Kp bins using CSI-like fixed window:
+#     start at day1 15-18UT, continue column-major, stop at day3 12-15UT (inclusive)
 #
 # Output path is atomically written:
 # /opt/hamclock-backend/htdocs/ham/HamClock/geomag/kindex.txt
@@ -16,8 +15,6 @@ import os
 import re
 import sys
 import tempfile
-from datetime import datetime, timezone
-from pathlib import Path
 
 import pandas as pd
 import requests
@@ -40,8 +37,6 @@ ROW_ORDER = [
     "21-00UT",
 ]
 
-BIN_STARTS = [0, 3, 6, 9, 12, 15, 18, 21]
-
 
 def fetch_text(url: str) -> str:
     r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
@@ -50,49 +45,12 @@ def fetch_text(url: str) -> str:
     return r.text
 
 
-def get_forecast_start(now: datetime | None = None) -> tuple[str, int]:
-    """
-    Determine the forecast window start row and column based on current UTC time.
-
-    The current 3-hour bin is considered "being observed" so the forecast
-    starts at the NEXT bin. If that next bin rolls over midnight, we start
-    on day2 (col_idx=1).
-
-    Returns:
-        (start_row, start_col_idx) e.g. ("15-18UT", 0) or ("00-03UT", 1)
-    """
-    if now is None:
-        now = datetime.now(timezone.utc)
-
-    hour = now.hour
-
-    # Find the current 3-hour bin index (0-7)
-    current_bin_idx = max(i for i, b in enumerate(BIN_STARTS) if b <= hour)
-
-    # Next bin is the forecast start
-    next_bin_idx = (current_bin_idx + 1) % 8
-
-    next_bin_start = BIN_STARTS[next_bin_idx]
-    next_bin_end = (next_bin_start + 3) % 24
-
-    if next_bin_end == 0:
-        row_label = "21-00UT"
-    else:
-        row_label = f"{next_bin_start:02d}-{next_bin_end:02d}UT"
-
-    # If next bin rolls over midnight (idx wraps to 0), we're on day2
-    col_idx = 1 if next_bin_idx == 0 else 0
-
-    return row_label, col_idx
-
-
 def parse_daily_kp_observed(text: str) -> pd.Series:
     """
-    Parse SWPC daily-geomagnetic-indices.txt and return chronological valid
-    Planetary Kp bins.
+    Parse SWPC daily-geomagnetic-indices.txt and return chronological valid Planetary Kp bins.
 
-    Assumption (matches SWPC product): the LAST 8 numeric fields on each data
-    row are Planetary Kp values for 00-03, 03-06, ..., 21-24 UTC.
+    Assumption (matches SWPC product): the LAST 8 numeric fields on each data row are
+    Planetary Kp values for 00-03, 03-06, ..., 21-24 UTC.
     """
     vals = []
     date_row_re = re.compile(r"^\s*(\d{4})\s+(\d{2})\s+(\d{2})\b")
@@ -127,19 +85,19 @@ def parse_daily_kp_observed(text: str) -> pd.Series:
 def parse_kp_forecast_window(
     text: str,
     start_row: str = "15-18UT",
-    start_col_idx: int = 0,
+    start_col_idx: int = 0,   # first forecast column
     end_row: str = "12-15UT",
-    end_col_idx: int = 2,
+    end_col_idx: int = 2,     # third forecast column
 ) -> pd.Series:
     """
-    Parse the NOAA Kp forecast table from 3-day-geomag-forecast.txt and return
-    a pandas Series traversed in column-major order from (start_col_idx,
-    start_row) to (end_col_idx, end_row), inclusive.
+    Parse the NOAA Kp forecast table from 3-day-geomag-forecast.txt and return a
+    pandas Series traversed in column-major order from (start_col_idx, start_row)
+    to (end_col_idx, end_row), inclusive.
 
-    Always produces exactly 16 values by dynamically computing the end
-    position from the start position.
+    Default CSI-like window:
+      day1 15-18UT -> day3 12-15UT  (16 values total)
 
-    Returns a Series of floats.
+    Returns a Series of floats (no labels needed for kindex output).
     """
     lines = text.splitlines()
 
@@ -164,9 +122,7 @@ def parse_kp_forecast_window(
     date_line = lines[date_line_idx]
     day_labels = re.findall(r"[A-Z][a-z]{2}\s+\d{1,2}", date_line)
     if len(day_labels) < 3:
-        raise RuntimeError(
-            f"Could not parse 3 forecast day labels from line: {date_line!r}"
-        )
+        raise RuntimeError(f"Could not parse 3 forecast day labels from line: {date_line!r}")
     day_labels = day_labels[:3]
 
     # Parse the 8 UT rows
@@ -191,10 +147,17 @@ def parse_kp_forecast_window(
     if missing:
         raise RuntimeError(f"Missing Kp forecast rows: {missing}")
 
-    if start_row not in ROW_ORDER:
-        raise RuntimeError(f"Invalid start row label: {start_row}")
-    if not (0 <= start_col_idx <= 2):
-        raise RuntimeError("Column index must be in range 0..2")
+    if start_row not in ROW_ORDER or end_row not in ROW_ORDER:
+        raise RuntimeError(f"Invalid row labels: start={start_row}, end={end_row}")
+    if not (0 <= start_col_idx <= 2 and 0 <= end_col_idx <= 2):
+        raise RuntimeError("Column indexes must be in range 0..2")
+
+    start_row_idx = ROW_ORDER.index(start_row)
+    end_row_idx = ROW_ORDER.index(end_row)
+
+    # Validate traversal ordering in column-major space
+    if (end_col_idx, end_row_idx) < (start_col_idx, start_row_idx):
+        raise RuntimeError("End position is before start position")
 
     # Build ordered matrix
     df = pd.DataFrame(
@@ -204,23 +167,7 @@ def parse_kp_forecast_window(
         dtype="float64",
     )
 
-    # Dynamically compute end position from start so we always get 16 values
-    total_bins = len(ROW_ORDER) * 3  # 24 total bins across 3 days
-    start_flat = start_col_idx * len(ROW_ORDER) + ROW_ORDER.index(start_row)
-    end_flat = start_flat + 15  # 16 values inclusive = +15
-
-    if end_flat >= total_bins:
-        raise RuntimeError(
-            f"Forecast window overruns available data: start_flat={start_flat}, "
-            f"end_flat={end_flat}, total_bins={total_bins}"
-        )
-
-    end_col_idx = end_flat // len(ROW_ORDER)
-    end_row_idx = end_flat % len(ROW_ORDER)
-    end_row = ROW_ORDER[end_row_idx]
-
     out_vals: list[float] = []
-    start_row_idx = ROW_ORDER.index(start_row)
 
     for c in range(start_col_idx, end_col_idx + 1):
         r_start = start_row_idx if c == start_col_idx else 0
@@ -231,9 +178,7 @@ def parse_kp_forecast_window(
     fc = pd.Series(out_vals, dtype="float64").reset_index(drop=True)
 
     if len(fc) != 16:
-        raise RuntimeError(
-            f"Expected 16 forecast Kp bins from dynamic window, got {len(fc)}"
-        )
+        raise RuntimeError(f"Expected 16 forecast Kp bins from fixed window, got {len(fc)}")
 
     return fc
 
@@ -263,16 +208,14 @@ def atomic_write_lines(path: str, values: pd.Series) -> None:
 
 def main() -> int:
     try:
-        now = datetime.now(timezone.utc)
-
         daily_text = fetch_text(DAILY_URL)
         fcst_text = fetch_text(FCST_URL)
 
         obs = parse_daily_kp_observed(daily_text).tail(56).reset_index(drop=True)
 
-        # Dynamic forecast window based on current UTC time
-        start_row, start_col = get_forecast_start(now)
-        fc = parse_kp_forecast_window(fcst_text, start_row=start_row, start_col_idx=start_col)
+        # CSI-like fixed 16-bin forecast window:
+        # day1 15-18UT -> day3 12-15UT (inclusive), column-major
+        fc = parse_kp_forecast_window(fcst_text)
 
         out = pd.concat([obs, fc], ignore_index=True)
 

@@ -1,19 +1,14 @@
 #!/usr/bin/env bash
-# update_wx_maps.sh
+set -e
+
+# update_wx_mb_maps.sh
 #
-# Generates HamClock weather maps in multiple sizes:
-#   Wx-mB  — pressure in millibars  (map-D/N-WxH-Wx-mB.bmp[.z])
-#   Wx-in  — pressure in inches Hg  (map-D/N-WxH-Wx-in.bmp[.z])
-#
-# GMT base is built with the classic pscoast/psconvert pipeline (compatible
-# with GMT 6.5.0 and pixel-exact for all sizes including very large ones).
-# ImageMagick pixel/memory limits are raised so 7920x3960 etc. succeed.
+# Generates HamClock Wx-mB maps in multiple sizes using a GMT-generated black/white
+# base (not Countries.bmp.z), then overlays weather via Python renderer.
 #
 # Composition order:
-#   1) Build neutral GMT base (black land+sea, same geometry for D/N)
+#   1) Build neutral GMT base (same geometry for D/N)
 #   2) Render weather (temp/isobars/wind) on top
-#   3) Boost brightness for Day variant
-#   4) Overlay black coastlines/borders on top of weather colours
 
 set -euo pipefail
 export LC_ALL=C
@@ -55,89 +50,25 @@ mkdir -p "$OUTDIR" "$TMPROOT" "$MPLCONFIGDIR"
 TMPDIR="$(mktemp -d -p "$TMPROOT" wxmb.XXXXXX)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
-# ---------------------------------------------------------------------------
-# ImageMagick 6: raise resource limits so very large maps (7920x3960 etc.)
-# succeed without "cache resources exhausted" errors.
-#
-# Valid IM6 -limit resource names: width height area memory map disk
-# ("pixels" does NOT exist in IM6; use "area" for pixel-count cap instead).
-# IM6 accepts plain MB/GB — NOT GiB/MiB.
-# ---------------------------------------------------------------------------
-export MAGICK_LIMIT_WIDTH=65536
-export MAGICK_LIMIT_HEIGHT=65536
-export MAGICK_LIMIT_AREA=4096MB
-export MAGICK_LIMIT_MEMORY=2048MB
-export MAGICK_LIMIT_MAP=4096MB
-export MAGICK_LIMIT_DISK=8192MB
-
-im_convert() {
-  convert \
-    -limit width    65536  \
-    -limit height   65536  \
-    -limit area     4096MB \
-    -limit memory   2048MB \
-    -limit map      4096MB \
-    -limit disk     8192MB \
-    "$@"
-}
-
-# ---------------------------------------------------------------------------
-# make_wx_base_bmp  tag W H out_bmp_z
-#
-# Builds a solid-black equirectangular world map (land + sea both black).
-# Uses the classic pscoast/psconvert pipeline so the pixel dimensions are
-# exact for all sizes and results are identical to make_wx_line_overlay_png.
-# This also avoids the gmt begin/end PNG-size mismatch seen in GMT 6.5.0.
-# ---------------------------------------------------------------------------
+# Build neutral GMT base (same for Day/Night geometry)
 make_wx_base_bmp() {
   local tag="$1" W="$2" H="$3" out_bmp_z="$4"
 
-  local stem_base="wxbase_${tag}_${W}x${H}"
-  local ps="$TMPDIR/${stem_base}.ps"
-  local png="$TMPDIR/${stem_base}.png"
-  local raw="$TMPDIR/${stem_base}.raw"
-  local bmp="$TMPDIR/${stem_base}.bmp"
+  local stem="$TMPDIR/wxbase_${tag}_${W}x${H}"
+  local png="${stem}.png"
+  local png_fixed="${stem}_fixed.png"
+  local raw="${stem}.raw"
+  local bmp="${stem}.bmp"
 
-  # Classic PostScript pipeline — pixel-exact, works in GMT 6.5.0.
-  # "gmt set PS_MEDIA" in a private GMT_USERDIR sub-dir ensures the page is
-  # sized to exactly the map so pscoast never warns and psconvert -A is clean.
-  # (GMT 6 classic mode ignores the GMT_PS_MEDIA env var; gmt.conf wins.)
-  (
-    cd "$TMPDIR" || exit 1
-    rm -f "$ps" "$png"
+  gmt begin "$stem" png
+    gmt coast -R-180/180/-90/90 -JQ0/${W}p -Gblack -Sblack -A10000
+    gmt coast -R-180/180/-90/90 -JQ0/${W}p -W0.5p,black -N1/0.4p,black -A10000
+  gmt end || { echo "gmt failed for Wx base $tag ${W}x${H}" >&2; return 1; }
 
-    local W_cm H_cm
-    W_cm=$(awk "BEGIN{printf \"%.4f\", $W * 2.54 / 72}")
-    H_cm=$(awk "BEGIN{printf \"%.4f\", $H * 2.54 / 72}")
+  convert "$png" -resize "${W}x${H}!" "$png_fixed" || {
+    echo "resize failed for Wx base $tag ${W}x${H}" >&2; return 1; }
 
-    local gmt_conf_dir="$TMPDIR/gmtconf_base_${W}x${H}"
-    mkdir -p "$gmt_conf_dir"
-    GMT_USERDIR="$gmt_conf_dir" gmt set \
-      PS_MEDIA "${W_cm}cx${H_cm}c" \
-      MAP_ORIGIN_X 0c \
-      MAP_ORIGIN_Y 0c
-
-    GMT_USERDIR="$gmt_conf_dir" \
-    gmt pscoast \
-      -R-180/180/-90/90 \
-      -JX${W}p/${H}p \
-      -X0 -Y0 \
-      -Gblack -Sblack -A10000 \
-      -P -K > "$ps" && \
-    gmt psxy -R -J -T -O >> "$ps" && \
-    GMT_USERDIR="$gmt_conf_dir" \
-    gmt psconvert "$ps" -Tg -E72 -A -F"$stem_base"
-  ) || { echo "gmt failed for Wx base $tag ${W}x${H}" >&2; return 1; }
-
-  [[ -f "$png" ]] || {
-    echo "Wx base PNG not found: $png" >&2
-    ls -l "$TMPDIR" >&2 || true
-    return 1
-  }
-
-  # psconvert -E72 gives near-exact output; resize to guarantee exact WxH
-  # (psconvert -A may add/remove 1px due to stroke half-width at edges)
-  im_convert "$png" -resize "${W}x${H}!" RGB:"$raw" || {
+  convert "$png_fixed" RGB:"$raw" || {
     echo "raw extract failed for Wx base $tag ${W}x${H}" >&2; return 1; }
 
   "$PYTHON_BIN" "$RAW2BMP_PY" --in "$raw" --out "$bmp" --width "$W" --height "$H" || {
@@ -150,49 +81,33 @@ zcompress_file(sys.argv[1], sys.argv[2], level=9)
 PY
   [[ -f "$out_bmp_z" ]] || { echo "zlib failed for Wx base $tag ${W}x${H}" >&2; return 1; }
 
-  rm -f "$png" "$ps" "$raw" "$bmp"
+  rm -f "$png" "$png_fixed" "$raw" "$bmp"
 }
 
-# ---------------------------------------------------------------------------
-# make_wx_line_overlay_png  W H out_png
-#
-# Transparent PNG with only black coastlines + country borders.
-# Composited AFTER weather rendering so geographic lines stay crisp.
-# ---------------------------------------------------------------------------
+# Build transparent line overlay (black coastlines + country borders only)
+# Used AFTER weather rendering so black lines remain visible.
 make_wx_line_overlay_png() {
   local W="$1" H="$2" out_png="$3"
 
-  local stem_base="wxlines_src_${W}x${H}"
-  local ps="$TMPDIR/${stem_base}.ps"
+  local stem_base="wxlines_src_${W}x${H}"   
   local png="$TMPDIR/${stem_base}.png"
 
-  rm -f "$ps" "$png" "$out_png"
+  rm -f "$png" "$out_png"
 
+   local ps="$TMPDIR/${stem_base}.ps"
   (
     cd "$TMPDIR" || exit 1
+    rm -f "$ps" "$png"
 
-    local W_cm H_cm
-    W_cm=$(awk "BEGIN{printf \"%.4f\", $W * 2.54 / 72}")
-    H_cm=$(awk "BEGIN{printf \"%.4f\", $H * 2.54 / 72}")
-
-    local gmt_conf_dir="$TMPDIR/gmtconf_lines_${W}x${H}"
-    mkdir -p "$gmt_conf_dir"
-    GMT_USERDIR="$gmt_conf_dir" gmt set \
-      PS_MEDIA "${W_cm}cx${H_cm}c" \
-      MAP_ORIGIN_X 0c \
-      MAP_ORIGIN_Y 0c
-
-    GMT_USERDIR="$gmt_conf_dir" \
     gmt pscoast \
       -R-180/180/-90/90 \
       -JX${W}p/${H}p \
       -X0 -Y0 \
       -W0.6p,black -N1/0.45p,black -A10000 \
-      -P -K > "$ps" && \
+      -B0 -P -K > "$ps" && \
     gmt psxy -R -J -T -O >> "$ps" && \
-    GMT_USERDIR="$gmt_conf_dir" \
-    gmt psconvert "$ps" -Tg -E72 -A -F"$stem_base"
-  ) || { echo "gmt failed for Wx line overlay ${W}x${H}" >&2; return 1; }
+    gmt psconvert "$ps" -Tg -A -F"$stem_base"
+  ) || { echo "gmt failed for Wx line overlay ${W}x${H}" >&2; return 1;} 
 
   [[ -f "$png" ]] || {
     echo "line overlay PNG not found: $png" >&2
@@ -201,7 +116,7 @@ make_wx_line_overlay_png() {
   }
 
   # Convert white background to transparent; preserve black lines
-  im_convert "$png" \
+  convert "$png" \
     -fuzz 8% -transparent white \
     -resize "${W}x${H}!" \
     "$out_png" || {
@@ -214,41 +129,35 @@ make_wx_line_overlay_png() {
     return 1
   }
 
-  rm -f "$png" "$ps" "$TMPDIR/${stem_base}.eps"
+  rm -f "$png" "$TMPDIR/${stem_base}.ps" "$TMPDIR/${stem_base}.eps"
 }
 
-# ---------------------------------------------------------------------------
-# boost_day_wx_brightness  W H map_type
-#
-# Applies brightness/saturation boost to the Day map in-place.
-# map_type is e.g. "Wx-mB" or "Wx-in".
-# ---------------------------------------------------------------------------
 boost_day_wx_brightness() {
-  local W="$1" H="$2" map_type="$3"
+  local W="$1" H="$2"
 
-  local in_bmp="$OUTDIR/map-D-${W}x${H}-${map_type}.bmp"
-  local out_z="$OUTDIR/map-D-${W}x${H}-${map_type}.bmp.z"
-  local stem="$TMPDIR/wxbright_D_${W}x${H}_${map_type}"
+  local in_bmp="$OUTDIR/map-D-${W}x${H}-Wx-mB.bmp"
+  local out_z="$OUTDIR/map-D-${W}x${H}-Wx-mB.bmp.z"
+  local stem="$TMPDIR/wxbright_D_${W}x${H}"
   local png="${stem}.png"
   local png_out="${stem}_out.png"
   local raw="${stem}.raw"
 
   [[ -f "$in_bmp" ]] || { echo "ERROR: missing Day Wx map $in_bmp" >&2; return 1; }
 
-  im_convert "$in_bmp" "$png" || {
-    echo "convert bmp->png failed for Day Wx ${map_type} ${W}x${H}" >&2; return 1; }
+  convert "$in_bmp" "$png" || { echo "convert bmp->png failed for Day Wx ${W}x${H}" >&2; return 1; }
 
-  # Modest brightness + saturation boost; tune if needed
-  im_convert "$png" \
+  # modest brighten/saturation boost; tune if needed
+
+    convert "$png" \
     -modulate 148,132,100 \
     -gamma 1.08 \
-    "$png_out" || { echo "brightness boost failed for Day Wx ${map_type} ${W}x${H}" >&2; return 1; }
+    "$png_out" || { echo "brightness boost failed for Day Wx ${W}x${H}" >&2; return 1; }
 
-  im_convert "$png_out" -resize "${W}x${H}!" RGB:"$raw" || {
-    echo "png->raw failed for brightened Day Wx ${map_type} ${W}x${H}" >&2; return 1; }
+  convert "$png_out" -resize "${W}x${H}!" RGB:"$raw" || {
+    echo "png->raw failed for brightened Day Wx ${W}x${H}" >&2; return 1; }
 
   "$PYTHON_BIN" "$RAW2BMP_PY" --in "$raw" --out "$in_bmp" --width "$W" --height "$H" || {
-    echo "bmp rewrite failed for brightened Day Wx ${map_type} ${W}x${H}" >&2; return 1; }
+    echo "bmp rewrite failed for brightened Day Wx ${W}x${H}" >&2; return 1; }
 
   "$PYTHON_BIN" - <<'PY' "$in_bmp" "$out_z"
 from hc_zlib import zcompress_file
@@ -259,45 +168,35 @@ PY
   rm -f "$png" "$png_out" "$raw"
 }
 
-# ---------------------------------------------------------------------------
-# overlay_black_borders_on_wx_output  tag W H map_type
-#
-# Composites black coastlines/borders OVER the final rendered Wx map.
-# map_type is e.g. "Wx-mB" or "Wx-in".
-# The line overlay PNG is built once per size and reused across map types.
-# ---------------------------------------------------------------------------
+# Composite black coastline/country lines OVER final Wx map (D or N)
 overlay_black_borders_on_wx_output() {
-  local tag="$1" W="$2" H="$3" map_type="$4"
+  local tag="$1" W="$2" H="$3"
 
-  local in_bmp="$OUTDIR/map-${tag}-${W}x${H}-${map_type}.bmp"
-  local out_z="$OUTDIR/map-${tag}-${W}x${H}-${map_type}.bmp.z"
-  # Shared line overlay per size (built once, reused for both Wx-mB and Wx-in)
+  local in_bmp="$OUTDIR/map-${tag}-${W}x${H}-Wx-mB.bmp"
+  local out_z="$OUTDIR/map-${tag}-${W}x${H}-Wx-mB.bmp.z"
   local line_png="$TMPDIR/wxlines_${W}x${H}.png"
 
   [[ -f "$in_bmp" ]] || { echo "ERROR: missing Wx map $in_bmp" >&2; return 1; }
 
-  # Build the line overlay only if not already cached for this size
-  if [[ ! -f "$line_png" ]]; then
-    make_wx_line_overlay_png "$W" "$H" "$line_png"
-  fi
+  make_wx_line_overlay_png "$W" "$H" "$line_png"
 
-  local stem="$TMPDIR/wxlines_comp_${tag}_${W}x${H}_${map_type}"
+  local stem="$TMPDIR/wxlines_comp_${tag}_${W}x${H}"
   local png="${stem}.png"
   local png_out="${stem}_out.png"
   local raw="${stem}.raw"
 
-  im_convert "$in_bmp" "$png" || {
-    echo "convert bmp->png failed for Wx ${tag} ${map_type} ${W}x${H}" >&2; return 1; }
+  convert "$in_bmp" "$png" || {
+    echo "convert bmp->png failed for Wx ${tag} ${W}x${H}" >&2; return 1; }
 
-  # Composite line overlay last so borders stay crisp on top of temp shading
-  im_convert "$png" "$line_png" -compose over -composite "$png_out" || {
-    echo "border overlay composite failed for Wx ${tag} ${map_type} ${W}x${H}" >&2; return 1; }
+  # Composite line overlay last so borders stay black on top of temp shading/haze
+  convert "$png" "$line_png" -compose over -composite "$png_out" || {
+    echo "border overlay composite failed for Wx ${tag} ${W}x${H}" >&2; return 1; }
 
-  im_convert "$png_out" -resize "${W}x${H}!" RGB:"$raw" || {
-    echo "png->raw failed after border overlay for Wx ${tag} ${map_type} ${W}x${H}" >&2; return 1; }
+  convert "$png_out" -resize "${W}x${H}!" RGB:"$raw" || {
+    echo "png->raw failed after border overlay for Wx ${tag} ${W}x${H}" >&2; return 1; }
 
   "$PYTHON_BIN" "$RAW2BMP_PY" --in "$raw" --out "$in_bmp" --width "$W" --height "$H" || {
-    echo "bmp rewrite failed after border overlay for Wx ${tag} ${map_type} ${W}x${H}" >&2; return 1; }
+    echo "bmp rewrite failed after border overlay for Wx ${tag} ${W}x${H}" >&2; return 1; }
 
   "$PYTHON_BIN" - <<'PY' "$in_bmp" "$out_z"
 from hc_zlib import zcompress_file
@@ -305,24 +204,17 @@ import sys
 zcompress_file(sys.argv[1], sys.argv[2], level=9)
 PY
   [[ -f "$out_z" ]] || {
-    echo "zlib rewrite failed after border overlay for Wx ${tag} ${map_type} ${W}x${H}" >&2; return 1; }
+    echo "zlib rewrite failed after border overlay for Wx ${tag} ${W}x${H}" >&2; return 1; }
 
   rm -f "$png" "$png_out" "$raw"
 }
 
-# ---------------------------------------------------------------------------
-# GFS download
-# ---------------------------------------------------------------------------
 pick_and_download() {
   local ymd="$1" hh="$2"
   local file="gfs.t${hh}z.pgrb2.0p25.f000"
   local dir="%2Fgfs.${ymd}%2F${hh}%2Fatmos"
 
-  local url="${NOMADS_FILTER}?file=${file}"\
-"&lev_mean_sea_level=on&lev_10_m_above_ground=on&lev_2_m_above_ground=on"\
-"&var_PRMSL=on&var_UGRD=on&var_VGRD=on&var_TMP=on"\
-"&leftlon=0&rightlon=359.75&toplat=90&bottomlat=-90"\
-"&dir=${dir}"
+  local url="${NOMADS_FILTER}?file=${file}&lev_mean_sea_level=on&lev_10_m_above_ground=on&lev_2_m_above_ground=on&var_PRMSL=on&var_UGRD=on&var_VGRD=on&var_TMP=on&leftlon=0&rightlon=359.75&toplat=90&bottomlat=-90&dir=${dir}"
 
   echo "Trying GFS ${ymd} ${hh}Z ..."
   curl -fs -A "open-hamclock-backend/1.0" --retry 2 --retry-delay 2 "$url" -o "$TMPDIR/gfs.grb2"
@@ -361,92 +253,69 @@ if [[ "$downloaded" -ne 1 ]]; then
   exit 1
 fi
 
-# ---------------------------------------------------------------------------
-# render_one  tag W H base map_type log_inventory
-#
-# Calls the Python renderer.  map_type controls both the output filename
-# suffix and the pressure unit:
-#   Wx-mB  → millibars  (no extra flag, existing renderer default)
-#   Wx-in  → inches Hg  (--units inches --map-type Wx-in)
-# ---------------------------------------------------------------------------
 render_one() {
-  local tag="$1" W="$2" H="$3" base="$4" map_type="$5" log_inventory="${6:-0}"
+  local tag="$1" W="$2" H="$3" base="$4" log_inventory="${5:-0}"
 
   local inv_flag=()
-  [[ "$log_inventory" -eq 1 ]] && inv_flag=(--log-inventory)
-
-  local unit_flags=()
-  if [[ "$map_type" == "Wx-in" ]]; then
-    unit_flags=(--units inches --map-type Wx-in)
+  if [[ "$log_inventory" -eq 1 ]]; then
+    inv_flag=(--log-inventory)
   fi
 
   "$PYTHON_BIN" "$RENDER_PY" \
-    --grib    "$TMPDIR/gfs.grb2" \
-    --base    "$base" \
-    --outdir  "$OUTDIR" \
-    --tag     "$tag" \
-    --width   "$W" \
-    --height  "$H" \
-    "${unit_flags[@]}" \
+    --grib "$TMPDIR/gfs.grb2" \
+    --base "$base" \
+    --outdir "$OUTDIR" \
+    --tag "$tag" \
+    --width "$W" \
+    --height "$H" \
     "${inv_flag[@]}"
 }
 
-# ---------------------------------------------------------------------------
-# Main loop
-# ---------------------------------------------------------------------------
 logged_inventory=0
 
 for wh in "${SIZES[@]}"; do
   W="${wh%x*}"
   H="${wh#*x}"
 
-  # One base image is shared between the two pressure-unit variants —
-  # the base is solid black (no colour), so units don't affect it.
-  WX_BASE="$TMPDIR/map-WxBase-${W}x${H}.bmp.z"
+  DAY_WX_BASE="$TMPDIR/map-D-${W}x${H}-WxBase.bmp.z"
+  NIGHT_WX_BASE="$TMPDIR/map-N-${W}x${H}-WxBase.bmp.z"
 
-  echo "=== Building GMT base ${W}x${H} ==="
-  make_wx_base_bmp "base" "$W" "$H" "$WX_BASE"
+  echo "Building Wx base Day ${W}x${H} (GMT base)"
+  make_wx_base_bmp "D" "$W" "$H" "$DAY_WX_BASE"
 
-  for map_type in Wx-mB Wx-in; do
-    echo "--- ${map_type} Day ${W}x${H} ---"
+  echo "Rendering Wx-mB Day ${W}x${H}"
+  if [[ "$logged_inventory" -eq 0 ]]; then
+    render_one "D" "$W" "$H" "$DAY_WX_BASE" 1
+    logged_inventory=1
+  else
+    render_one "D" "$W" "$H" "$DAY_WX_BASE" 0
+  fi
 
-    echo "Rendering ${map_type} Day ${W}x${H}"
-    if [[ "$logged_inventory" -eq 0 ]]; then
-      render_one "D" "$W" "$H" "$WX_BASE" "$map_type" 1
-      logged_inventory=1
-    else
-      render_one "D" "$W" "$H" "$WX_BASE" "$map_type" 0
-    fi
+  echo "Boosting Day brightness for final Wx-mB Day ${W}x${H}"
+  boost_day_wx_brightness "$W" "$H"
 
-    echo "Boosting Day brightness for ${map_type} ${W}x${H}"
-    boost_day_wx_brightness "$W" "$H" "$map_type"
+  echo "Overlaying black borders on final Wx-mB Day ${W}x${H}"
+  overlay_black_borders_on_wx_output "D" "$W" "$H"
 
-    echo "Overlaying black borders on ${map_type} Day ${W}x${H}"
-    overlay_black_borders_on_wx_output "D" "$W" "$H" "$map_type"
+  echo "Building Wx base Night ${W}x${H} (GMT base)"
+  make_wx_base_bmp "N" "$W" "$H" "$NIGHT_WX_BASE"
 
-    echo "--- ${map_type} Night ${W}x${H} ---"
+  echo "Rendering Wx-mB Night ${W}x${H}"
+  render_one "N" "$W" "$H" "$NIGHT_WX_BASE" 0
 
-    echo "Rendering ${map_type} Night ${W}x${H}"
-    render_one "N" "$W" "$H" "$WX_BASE" "$map_type" 0
+  echo "Overlaying black borders on final Wx-mB Night ${W}x${H}"
+  overlay_black_borders_on_wx_output "N" "$W" "$H"
 
-    echo "Overlaying black borders on ${map_type} Night ${W}x${H}"
-    overlay_black_borders_on_wx_output "N" "$W" "$H" "$map_type"
+  chmod 0644 \
+    "$OUTDIR/map-D-${W}x${H}-Wx-mB.bmp" \
+    "$OUTDIR/map-D-${W}x${H}-Wx-mB.bmp.z" \
+    2>/dev/null || true
 
-    # Set permissions
+  if [[ -f "$OUTDIR/map-N-${W}x${H}-Wx-mB.bmp" ]]; then
     chmod 0644 \
-      "$OUTDIR/map-D-${W}x${H}-${map_type}.bmp" \
-      "$OUTDIR/map-D-${W}x${H}-${map_type}.bmp.z" \
-      2>/dev/null || true
-
-    if [[ -f "$OUTDIR/map-N-${W}x${H}-${map_type}.bmp" ]]; then
-      chmod 0644 \
-        "$OUTDIR/map-N-${W}x${H}-${map_type}.bmp" \
-        "$OUTDIR/map-N-${W}x${H}-${map_type}.bmp.z"
-    fi
-
-    echo "OK: ${map_type} maps ${W}x${H} complete"
-  done
+      "$OUTDIR/map-N-${W}x${H}-Wx-mB.bmp" \
+      "$OUTDIR/map-N-${W}x${H}-Wx-mB.bmp.z"
+  fi
 done
 
-echo ""
-echo "OK: All Wx maps (Wx-mB + Wx-in) updated in $OUTDIR"
+echo "OK: Wx-mB maps updated in $OUTDIR"
